@@ -1,0 +1,37 @@
+[project]
+name = "lexinit-ai-backend"
+version = "0.1.0"
+description = "Backend API for Lexinit AI"
+requires-python = ">=3.10"
+dependencies = [
+    "dnspython",
+    "flask",
+    "flask-cors",
+    "flask-mail",
+    "fuzzywuzzy",
+    "google-api-python-client",
+    "google-auth",
+    "google-cloud-vision",
+    "google-genai",
+    "gunicorn",
+    "isodate",
+    "langgraph>=0.4,<2",
+    "opentelemetry-api",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-instrumentation-flask",
+    "opentelemetry-sdk",
+    "pymongo",
+    "pydantic>=2",
+    "pymupdf",
+    "pymupdf4llm",
+    "python-dotenv",
+    "python-levenshtein",
+    "requests",
+    "redis>=5,<7",
+    "rq>=2,<3",
+    "werkzeug",
+    "youtube-transcript-api",
+]
+
+[tool.uv]
+package = false
