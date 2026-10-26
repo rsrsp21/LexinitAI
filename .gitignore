@@ -1,41 +1,75 @@
-# Environment files and folders
+# Environment files
 .env
-backend/.env
-backend/.uv-cache/
+.env.*
+!.env.example
+
+# Python virtual environments and caches
 lexinitenv/
 .venv/
-node_modules/
-frontend/node_modules/
-frontend/dist/
-backend/backups/
-*.lexbackup
-*.lexbackup.key
-*.lexbackup.sha256
-
-# Python virtual environments
+venv/
+.uv-cache/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python packaging (anchored to root/backend so frontend/src/lib isn't ignored)
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+backend/build/
+backend/dist/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Backups
+backend/backups/
+*.lexbackup
+*.lexbackup.key
+*.lexbackup.sha256
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.tanstack/
+frontend/.vite/
+*.tsbuildinfo
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs and local databases
+*.log
+logs/
+
+# Claude Code
+.claude/
 
 # IDE specific files
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
