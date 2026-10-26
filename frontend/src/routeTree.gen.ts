@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -29,6 +30,11 @@ import { Route as AppSessionIdMaterialsRouteImport } from './routes/app.session.
 import { Route as AppSessionIdFlashcardsRouteImport } from './routes/app.session.$id.flashcards'
 import { Route as AppSessionIdAssessmentsRouteImport } from './routes/app.session.$id.assessments'
 
+const WaitlistRoute = WaitlistRouteImport.update({
+  id: '/waitlist',
+  path: '/waitlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/waitlist'
     | '/app/insights'
     | '/app/new-course'
     | '/app/pricing'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/waitlist'
     | '/app/insights'
     | '/app/new-course'
     | '/app/pricing'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/waitlist'
     | '/app/insights'
     | '/app/new-course'
     | '/app/pricing'
@@ -260,10 +272,18 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  WaitlistRoute: typeof WaitlistRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/waitlist': {
+      id: '/waitlist'
+      path: '/waitlist'
+      fullPath: '/waitlist'
+      preLoaderRoute: typeof WaitlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terms': {
       id: '/terms'
       path: '/terms'
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  WaitlistRoute: WaitlistRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
