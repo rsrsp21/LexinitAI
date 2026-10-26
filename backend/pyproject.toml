@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Backend API for Lexinit AI"
 requires-python = ">=3.10"
 dependencies = [
+    "cryptography",
     "dnspython",
     "flask",
     "flask-cors",
