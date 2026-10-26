@@ -8,6 +8,10 @@
 - TanStack Query for server state and cache invalidation
 - Tailwind CSS for responsive styling
 - Motion for transitions and interaction animation
+- Radix UI primitives (dialog, select, label, slot)
+- Recharts for Progress charts
+- React Markdown with remark-math and rehype-katex for generated content (`markdown-content.tsx`)
+- Lenis smooth scrolling on the waitlist page
 - Zod runtime validation for important API responses
 
 ## Structure
@@ -32,6 +36,9 @@ src/styles.css               Tokens, themes, motion, and global layout
 | --- | --- |
 | `/` | Product homepage and authentication entry |
 | `/login` | Login redirect/entry |
+| `/waitlist` | Public waitlist landing page |
+| `/privacy` | Privacy policy |
+| `/terms` | Terms of service |
 | `/onboarding` | Required profile setup after registration |
 | `/app` | Protected application shell |
 | `/app/` | Learning dashboard and course list |
@@ -39,6 +46,7 @@ src/styles.css               Tokens, themes, motion, and global layout
 | `/app/insights` | Overall and course-level Progress dashboard |
 | `/app/reviews` | Scheduled review queue |
 | `/app/profile` | Profile, badges, identity, and password management |
+| `/app/pricing` | Pricing plans |
 | `/app/session/:id/path` | Full Learning Path and module navigation |
 | `/app/session/:id/materials` | Study Materials |
 | `/app/session/:id/flashcards` | Flashcards |

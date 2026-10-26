@@ -15,7 +15,8 @@
 - Use a long random `FLASK_SECRET_KEY` and `METRICS_TOKEN`.
 - Set `SESSION_COOKIE_SECURE=true` and keep `SESSION_COOKIE_SAMESITE=Lax` unless cross-site hosting requires a reviewed alternative.
 - Use explicit HTTPS origins in `CORS_ORIGINS`.
-- Configure Redis and run the RQ worker separately from the web process.
+- Serve the API with a WSGI server such as Gunicorn (`gunicorn app:application` from `backend/`), never `python app.py`, which starts Flask's debug server.
+- Configure Redis and run the RQ worker (`python worker.py`) separately from the web process.
 - Configure `OTEL_EXPORTER_OTLP_ENDPOINT` for trace export.
 - Keep database credentials, provider keys, and monitoring tokens outside source control.
 
@@ -47,7 +48,9 @@ The repository backup command creates an AES-256-GCM encrypted BSON archive, a s
 
 `uv run --project backend python -m backend.scripts.backup_database create`
 
-Store the `.lexbackup` archive and `.key` file in separate restricted locations. Neither file is committed to Git.
+Verify an existing archive with `uv run --project backend python -m backend.scripts.backup_database verify --archive <file>.lexbackup --key-file <file>.lexbackup.key`.
+
+Store the `.lexbackup` archive and `.lexbackup.key` file in separate restricted locations. Neither file is committed to Git.
 
 ## Load and alert gates
 

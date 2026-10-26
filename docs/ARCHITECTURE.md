@@ -19,15 +19,18 @@ flowchart LR
     API --> LEARN[Learning services]
     JOBS --> GEMINI[Gemini]
     JOBS --> YOUTUBE[YouTube APIs]
+    JOBS --> SEARCH[Google Custom Search]
     JOBS --> DOCS[Source extraction and retrieval]
-    JOBS --> QUEUE[RQ and Redis]
+    JOBS --> QUEUE[RQ and Redis or local thread pool]
     JOBS --> MONGO[(MongoDB)]
     LEARN --> MONGO
     LEARN --> ADAPT[Deterministic adaptive engine]
     ADAPT --> MONGO
 ```
 
-Redis/RQ is the production queue. Development can use the built-in local generation worker when Redis is not configured.
+Redis/RQ is the production queue. Development can use the built-in local generation worker when Redis is not configured. `GENERATION_WORKER_MODE` selects the behaviour: `auto` (default) uses RQ when `REDIS_URL` is set and otherwise falls back to the local worker, `rq` requires Redis, and `local` always runs in-process.
+
+The generation orchestrator is a LangGraph `StateGraph` (`prepare → curriculum → knowledge → artifacts → save`, with a conditional exit from `prepare` on a cached course). When LangGraph is unavailable the same nodes run sequentially. MongoDB, not the graph state, is the durable source of truth: workers claim a run with a time-limited lease, and incomplete runs are resumed on startup when `GENERATION_RESUME_ON_STARTUP` is enabled.
 
 ## Course generation
 
@@ -50,7 +53,7 @@ flowchart TD
     VALIDATE --> SAVE[(Atomic course save)]
 ```
 
-The generation run stores a checkpoint for the curriculum, knowledge packs, and every artifact family. A retry preserves completed checkpoints and reruns only missing or failed artifacts.
+The generation run stores a checkpoint for the curriculum, knowledge packs, and every artifact family. Artifact families are generated in parallel (up to four at a time). A retry preserves completed checkpoints and reruns only missing or failed artifacts. Failed or cancelled runs refund the learner's generation quota.
 
 Each module knowledge pack contains concepts, definitions, objectives, facts, examples, common mistakes, difficulty boundaries, source references, and precise video search terms. Generated artifacts carry curriculum, module, concept, objective, pack, source, prompt-version, and validation lineage.
 

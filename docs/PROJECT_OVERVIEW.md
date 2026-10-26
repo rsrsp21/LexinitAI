@@ -4,7 +4,7 @@ Lexinit is a personalized learning workspace that turns a topic or uploaded sour
 
 ## Product flow
 
-1. A learner registers, accepts the policies, and completes their learning profile.
+1. A learner registers, verifies their email with a one-time code, accepts the policies, and completes their learning profile.
 2. The learner creates a course from a topic, optional source, difficulty, and generation mode.
 3. Lexinit creates a curriculum and one authoritative knowledge pack per module.
 4. Study Materials, Flashcards, Assessments, and Video Lectures are aligned to those module packs.
@@ -27,18 +27,19 @@ Lexinit is a personalized learning workspace that turns a topic or uploaded sour
 - Course and overall learning analytics
 - Spaced-review queue and adaptive recommendations
 - Student, professional, and independent-learner profiles
-- Password reset and profile management
-- Durable, retryable generation jobs
+- Email-verified signup, password reset, and profile management
+- Durable, checkpointed, retryable generation jobs orchestrated with LangGraph
+- Public waitlist page and pricing page
 
 ## Technology
 
 | Area | Stack |
 | --- | --- |
-| Frontend | React 19, TypeScript, Vite, TanStack Router, TanStack Query, Tailwind CSS, Motion |
-| Backend | Python, Flask, Pydantic, LangGraph, RQ |
+| Frontend | React 19, TypeScript, Vite, TanStack Router, TanStack Query, Tailwind CSS, Radix UI, Motion, Lenis, Recharts, React Markdown + KaTeX |
+| Backend | Python, Flask, Pydantic, LangGraph, RQ, Flask-Mail |
 | Data | MongoDB; Redis for production job queues |
 | AI | Google Gemini structured generation |
-| External learning | YouTube Data API and transcript retrieval |
+| External learning | YouTube Data API, transcript retrieval, Google Custom Search |
 | Documents | PyMuPDF/PyMuPDF4LLM with optional Google Vision OCR |
 | Operations | OpenTelemetry, health/readiness endpoints, alert checks, encrypted backup tooling |
 
@@ -47,7 +48,6 @@ Lexinit is a personalized learning workspace that turns a topic or uploaded sour
 ```text
 backend/                 Flask application, domain services, schemas, jobs, scripts
 frontend/                React application, routes, components, API contracts
-docs/                    Project documentation and product language
 docs/                    All project documentation (architecture, runbook, design system, product language)
 ```
 

@@ -18,7 +18,10 @@ lexinit/schemas/           Request, domain, and structured-generation contracts
 lexinit/domain/            Pure grading and mastery policies
 lexinit/services/          Application workflows
 lexinit/repositories/      MongoDB persistence boundaries
+lexinit/observability/     Request context, OpenTelemetry, alert evaluation
 services/                  Course generation and durable run orchestration
+server_session.py          MongoDB-backed Flask login sessions
+session_store.py           Course (learning session) lookup and topic normalization
 clients.py                 Gemini, YouTube, Google service clients
 extensions.py              Mongo, mail, CORS, and shared extensions
 security.py                CSRF, headers, throttling, and session controls
@@ -30,7 +33,8 @@ Routes do not calculate mastery or trust client scores. Domain and application s
 
 | Module | Responsibility |
 | --- | --- |
-| `auth.py` | Registration, login, logout, password reset, profile identity |
+| `core.py` | Serves the built frontend (`frontend/dist`) and static images |
+| `auth.py` | Registration with email verification code, login, logout, password reset, profile identity |
 | `api.py` | Topic submission and compatibility API operations |
 | `course.py` | Course reads, progress, and course-level actions |
 | `learning_loop.py` | Secured Assessment attempts, answers, and finalization |
@@ -43,10 +47,16 @@ Routes do not calculate mastery or trust client scores. Domain and application s
 
 ## Generation state
 
-Generation runs live in MongoDB and include status, stage, progress, attempt count, leases, errors, completed steps, failed steps, and checkpoints. The orchestrator supports LangGraph when installed and a sequential equivalent for minimal environments.
+Generation runs live in MongoDB and include status, stage, progress, attempt count, leases, errors, completed steps, failed steps, and checkpoints. The orchestrator (`services/generation_jobs.py`) is a LangGraph `StateGraph` with the nodes `prepare → curriculum → knowledge → artifacts → save`; `prepare` exits early when a matching course already exists. A sequential equivalent runs when LangGraph is unavailable.
+
+The `artifacts` node generates all pending artifact families in parallel (thread pool of four), validates each against the curriculum and knowledge packs, and checkpoints it individually. Cancellation is checked between steps. On failure or cancellation the run is marked failed/cancelled (retryable except for safety failures) and the generation quota is refunded.
+
+Dispatch is controlled by `GENERATION_WORKER_MODE` (`auto`, `rq`, `local`). Workers claim runs with a lease (`GENERATION_LEASE_SECONDS`), and incomplete runs resume on startup when `GENERATION_RESUME_ON_STARTUP` is enabled.
 
 Important checkpoints:
 
+- `safety`
+- `cache`
 - `curriculum`
 - `knowledge_packs`
 - `artifact:study_materials`
