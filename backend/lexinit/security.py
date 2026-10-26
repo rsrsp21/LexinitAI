@@ -114,6 +114,8 @@ def _rate_policy(app, path: str, method: str) -> tuple[int, int]:
         return int(app.config.get("SOURCE_UPLOAD_RATE_LIMIT", 15)), 15 * 60
     if method == "POST" and path == "/api/v1/generation-runs":
         return int(app.config.get("GENERATION_START_RATE_LIMIT", 10)), 60 * 60
+    if method == "POST" and path == "/api/v1/waitlist":
+        return int(app.config.get("WAITLIST_RATE_LIMIT", 10)), 60 * 60
     return int(app.config.get("API_RATE_LIMIT_PER_MINUTE", 240)), 60
 
 
@@ -122,6 +124,8 @@ def _rate_bucket(path: str) -> str:
         return "sources"
     if path.startswith("/api/v1/generation-runs"):
         return "generation"
+    if path == "/api/v1/waitlist":
+        return "waitlist"
     if "assessment" in path or "retrieval-check" in path:
         return "assessment"
     return "general"

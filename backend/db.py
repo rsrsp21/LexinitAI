@@ -93,6 +93,7 @@ def ensure_database_schema(app):
         create_index_ignoring_equivalent_conflict(db.users, "email", unique=True)
         create_index_ignoring_equivalent_conflict(db.user_verify, "email", unique=True)
         create_index_ignoring_equivalent_conflict(db.password_resets, "email", unique=True)
+        create_index_ignoring_equivalent_conflict(db.waitlist, "email", unique=True)
         create_index_ignoring_equivalent_conflict(db.password_resets, "reset_expires_at", expireAfterSeconds=0)
         create_index_ignoring_equivalent_conflict(db.sessions, "user_id")
         create_index_ignoring_equivalent_conflict(db.sessions, [("user_id", 1), ("created_at", -1)])

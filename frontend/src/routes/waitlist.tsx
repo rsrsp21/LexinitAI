@@ -21,6 +21,7 @@ import { LogoSplit } from "@/components/logo-split";
 import { Marquee } from "@/components/marquee";
 import { Starfield } from "@/components/starfield";
 import { useSmoothScroll } from "@/components/smooth-scroll";
+import { apiErrorMessage, joinWaitlist } from "@/lib/api";
 
 export const Route = createFileRoute("/waitlist")({
   head: () => ({
@@ -536,19 +537,19 @@ function WaitlistForm() {
     setError(null);
     setStatus("submitting");
 
-    // TODO: replace with the real signup call, e.g.
-    //   await fetch("/api/waitlist", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({ email: trimmed, name, goal }),
-    //   });
-    // Nothing leaves the browser until that lands.
-    console.info("[waitlist] pending submission", {
-      email: trimmed,
-      name,
-      goal,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    try {
+      await joinWaitlist({
+        email: trimmed,
+        name: name.trim() || undefined,
+        goal: goal || undefined,
+      });
+    } catch (submitError) {
+      setError(
+        apiErrorMessage(submitError, "Could not join the waitlist. Try again."),
+      );
+      setStatus("idle");
+      return;
+    }
 
     try {
       localStorage.setItem(STORAGE_KEY, trimmed);

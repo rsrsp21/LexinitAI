@@ -673,6 +673,19 @@ export type SessionsResponse = {
   sessions: LearningSession[];
 };
 
+export type WaitlistSignup = {
+  email: string;
+  name?: string;
+  goal?: string;
+};
+
+export function joinWaitlist(signup: WaitlistSignup) {
+  return requestJson<ApiResult>("/api/v1/waitlist", {
+    method: "POST",
+    json: signup,
+  });
+}
+
 export function getMe() {
   return requestJson<MeResponse>("/api/v1/me");
 }
