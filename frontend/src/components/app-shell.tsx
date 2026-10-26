@@ -21,7 +21,6 @@ import {
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -51,7 +50,6 @@ import {
   getActiveGenerationRuns,
   getCourse,
   getSessions,
-  logout,
   type GenerationRun,
   type LearningSession,
 } from "@/lib/api";
@@ -356,8 +354,9 @@ function TopBar() {
     staleTime: 1_000,
   });
   const activeRun = data?.runs[0];
-  
-  const planLabel = user?.plan === "pro" ? "Pro" : user?.plan === "plus" ? "Plus" : "Free";
+
+  const plan = user?.user.plan;
+  const planLabel = plan === "pro" ? "Pro" : plan === "plus" ? "Plus" : "Free";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/88 backdrop-blur-xl">
