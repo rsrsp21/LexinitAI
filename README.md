@@ -293,10 +293,11 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 | --- | --- |
 | `FLASK_SECRET_KEY` | Session signing key (long and random in production) |
 | `MONGO_URI` / `USE_LOCAL_MONGO` | Database connection |
-| `GEMINI_API_KEY`, `GEMINI_MODEL_NAME`, `GEMINI_DEEP_FOCUS_MODEL_NAME`, `GEMINI_FALLBACK_MODEL_NAMES` | LLM access, the Deep Focus model, and the fallback chain |
+| `GEMINI_API_KEY` or `GEMINI_USE_VERTEX` | How Gemini is reached: an AI Studio API key, or Vertex AI through the service account (billed to Google Cloud) |
+| `GEMINI_MODEL_NAME`, `GEMINI_DEEP_FOCUS_MODEL_NAME`, `GEMINI_FALLBACK_MODEL_NAMES`, `GEMINI_COACH_MODEL_NAME` | The main model, the Deep Focus model, the fallback chain, and an optional faster model for in-course coaching and answer-key checks |
 | `YOUTUBE_API_KEY` | Video Lecture search |
 | `CUSTOM_SEARCH_API`, `SEARCH_ID` | Additional Resources search |
-| `GOOGLE_CREDENTIALS_BASE64` | Optional Google Cloud Vision OCR for scanned pages |
+| `GOOGLE_CREDENTIALS_BASE64` | Service account for Cloud Vision OCR of scanned pages and, with `GEMINI_USE_VERTEX`, for Gemini |
 | `REDIS_URL`, `GENERATION_WORKER_MODE` | Job queue (`auto`, `rq`, or `local`) |
 | `MAIL_*`, `MAIL_SUPPRESS_SEND` | Verification and reset emails (suppressed mode prints codes to the console) |
 | `METRICS_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Protected metrics and alerts, trace export |

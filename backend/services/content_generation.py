@@ -80,7 +80,7 @@ def _canonicalize_topic_cached(topic, model_name):
         "Return only the corrected topic title, max 80 characters.\n\n"
         f"Topic (JSON string): {json.dumps(topic, ensure_ascii=False)}"
     )
-    response = _generate(prompt, model_name, ["gemini-2.5-flash"])
+    response = _generate(prompt, model_name)
     raw = response.text.strip() if response and hasattr(response, "text") else ""
     return sanitize_canonical_topic(raw, topic)
 

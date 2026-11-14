@@ -195,7 +195,7 @@ def _get_gemini_model_cached(model_name, fallback_model_names):
 
 
 def get_gemini_model(model_name=None, fallback_model_names=None):
-    primary_model = model_name or _env("GEMINI_MODEL_NAME") or "gemini-2.5-flash-lite"
+    primary_model = model_name or _env("GEMINI_MODEL_NAME") or "gemini-3.8-flash"
     return _get_gemini_model_cached(primary_model, _fallback_tuple(fallback_model_names))
 
 

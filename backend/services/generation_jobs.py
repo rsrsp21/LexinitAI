@@ -94,7 +94,7 @@ class GenerationStepFailed(Exception):
 
 def model_for_generation_mode(app, mode):
     if mode == "Pro Reasoning":
-        return app.config.get("GEMINI_DEEP_FOCUS_MODEL_NAME") or "gemini-2.5-pro"
+        return app.config.get("GEMINI_DEEP_FOCUS_MODEL_NAME") or "gemini-4-argon"
     return None
 
 

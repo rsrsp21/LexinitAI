@@ -101,14 +101,13 @@ class Config:
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
     GEMINI_USE_VERTEX = os.environ.get("GEMINI_USE_VERTEX", "false").strip().lower() in {"1", "true", "yes", "on"}
     YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
-    CLOUD_VISION_API_KEY = os.environ.get("CLOUD_VISION_API_KEY")
     CUSTOM_SEARCH_API = os.environ.get("CUSTOM_SEARCH_API")
     SEARCH_ID = os.environ.get("SEARCH_ID")
     GOOGLE_CREDENTIALS_BASE64 = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
 
-    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-3.8-flash")
     GEMINI_COACH_MODEL_NAME = os.environ.get("GEMINI_COACH_MODEL_NAME")
-    GEMINI_DEEP_FOCUS_MODEL_NAME = os.environ.get("GEMINI_DEEP_FOCUS_MODEL_NAME", "gemini-2.5-pro")
+    GEMINI_DEEP_FOCUS_MODEL_NAME = os.environ.get("GEMINI_DEEP_FOCUS_MODEL_NAME", "gemini-4-argon")
 
     CORS_ORIGINS = [
         origin.strip()
