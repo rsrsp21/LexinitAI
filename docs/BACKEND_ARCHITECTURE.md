@@ -36,7 +36,8 @@ Routes do not calculate mastery or trust client scores. Domain and application s
 | `core.py` | Serves the built frontend (`frontend/dist`) and static images |
 | `auth.py` | Registration with email verification code, login, logout, password reset, profile identity |
 | `api.py` | Topic submission and compatibility API operations |
-| `course.py` | Course reads, progress, and course-level actions |
+| `course.py` | Course reads and progress, final assessment, course goal dates |
+| `coach.py` | In-course coaching: fix-it cards, explanations, practice sets, module pre-checks, daily mix, question reports |
 | `learning_loop.py` | Secured Assessment attempts, answers, and finalization |
 | `adaptive.py` | Mastery, weak concepts, recommendations, focused generation |
 | `video_learning.py` | Lecture catalog, playback progress, guides, retrieval checks |
@@ -97,6 +98,33 @@ validation_status
 4. Finalization rejects incomplete, expired, mismatched, replayed, or unauthorized attempts.
 5. The server grades against saved answers and writes an immutable submission.
 6. Mastery evidence and adaptive decisions are calculated server-side.
+
+A module assessment has four questions per type. When a learner has seen a module's questions, new ones are written on demand, weighted toward the concepts they got wrong (`concept_coach.refill_module_questions`). Every AI-written question added after course generation is solved a second time without its key and dropped if the key is disputed (`question_quality.verify_answer_keys`). Results store each question's concepts, module, and bank id, because attempt records expire about a day after use.
+
+## Adaptive learning loop
+
+Every answer, from any activity, becomes a `MasteryEvidence` record and updates one per-concept estimate (`domain/mastery/calculator.py`). Evidence sources and their relative weight:
+
+| Source | Weight | Notes |
+| --- | --- | --- |
+| Module assessment, final assessment | 1.0 | Final uses only unseen questions |
+| Daily mix | 0.9 | Due and weak concepts from every course |
+| Practice set, module pre-check | 0.8 | Fresh questions per concept |
+| Lecture knowledge check | 0.75 | Graded against the transcript |
+| Fix-it check | 0.6 | Asked right after the explanation |
+| Flashcard self-rating | 0.35 to 0.9 | By rating |
+| Carry-over from another course | 0.5 | Same-named concept, clear signal only |
+
+Correct answers are further scaled by difficulty, by the chance of guessing the format, and by whether the same question was seen recently; all evidence fades with a 45-day half-life. Reads apply a forgetting curve (`retention`), so mastery shown to the learner drops between reviews.
+
+Services built on that estimate:
+
+- `concept_coach.py`: responses sized to the gap (fix-it card, alternative explanation, practice set, pre-check, daily mix). Answers to coach questions stay on the server until submitted.
+- `final_assessment.py`: unlocks when every module is passed; twelve new questions weighted toward weak concepts; 70% to pass; a 24-hour wait after a failed attempt. Passing is required for course completion and the badge.
+- `learner_model.py`: knowledge map, mastery carry-over between courses, and course goal dates.
+- `course_deletion.py`: removes a course with its attempts, results, coach history, progress and mastery; mastery for a concept also practised elsewhere is recalculated instead of deleted.
+
+`scripts/evaluate_mastery.py` scores how well the estimate predicts each learner's next answer, on real evidence or simulated learners.
 
 ## Source grounding
 

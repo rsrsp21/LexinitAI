@@ -27,9 +27,10 @@ Each course combines Study Materials, Flashcards, three kinds of Assessments, a 
 1. **Sign up and onboard.** Email verification by one-time code, then a learner profile (student, working professional, or independent learner) that personalises generated content.
 2. **Create a course** from a topic, optionally grounded in uploaded PDFs or images, at easy, medium, or hard difficulty, in *Quick* or *Deep Focus* mode (a stronger reasoning model with its own quota).
 3. **Study** five ordered modules: Study Materials (Markdown with LaTeX math, printable), animated Flashcards, and a Video Lecture with a transcript-based Lecture Guide and knowledge check.
-4. **Get assessed** with Multiple Choice, True/False, and One-word questions, graded entirely on the server.
-5. **Adapt.** Every answer updates per-concept mastery. Weak concepts produce targeted recommendations, a spaced-review queue, and the option to generate a focused course on just those concepts.
-6. **Track progress** per course and overall, and earn completion badges.
+4. **Get assessed** with Multiple Choice, True/False, and One-word questions, graded entirely on the server. Each module assessment has four questions per type, and a reattempt uses new questions.
+5. **Get coached on mistakes.** A wrong answer opens a *fix-it card*: why that answer was tempting, the key idea, and one fresh question to prove the gap is closed. Any concept can be explained a different way (simpler, analogy, worked example, step by step) or practised with three new questions.
+6. **Adapt across time.** Every answer updates per-concept mastery, which fades without practice. A daily mix reviews what is due or weak across all courses, a knowledge map shows what is known and what is fading, and a finish date becomes a daily pace.
+7. **Earn the badge** by passing a final assessment: new questions across every module, weighted toward the learner's weakest concepts.
 
 A public waitlist page and a pricing page (Free, Plus, Pro plans with different daily generation limits) sit alongside the app.
 
@@ -64,14 +65,23 @@ Every artifact is generated *from* those packs and then **checked against them**
 
 The LLM never grades, authorises, or decides what a learner should do next.
 
-- **Mastery model** ([`lexinit/domain/mastery/calculator.py`](./backend/lexinit/domain/mastery/calculator.py)): a Bayesian **Beta-Bernoulli** estimate per concept, starting from a Beta(2, 2) prior. Correct answers update α and incorrect ones update β, weighted by difficulty (0.8 / 1.0 / 1.2). The resulting probability maps to bands: weak (< 0.40), developing, proficient, and mastered (≥ 0.85).
-- **Adaptive policy** ([`lexinit/domain/mastery/policy.py`](./backend/lexinit/domain/mastery/policy.py)): a pure function that chooses one of seven actions (misconception correction, prerequisite remediation, weak-topic remediation, targeted practice, application practice, difficulty progression, spaced review). Each decision is stored with **machine-readable reason codes** and the evidence IDs behind it, so every recommendation is explainable.
-- **Spaced review.** The next review date follows the mastery band (1, 3, 7, or 14 days). Self-rated reviews (Again, Hard, Good, Easy) feed back in as weighted evidence.
+- **Mastery model** ([`lexinit/domain/mastery/calculator.py`](./backend/lexinit/domain/mastery/calculator.py)): a Bayesian **Beta-Bernoulli** estimate per concept, starting from a Beta(2, 2) prior. Each answer is weighted by how much it actually says:
+  - **Difficulty is asymmetric.** A hard question answered correctly counts more; an easy question answered wrongly counts more.
+  - **Guessing is discounted.** A correct True/False answer counts half, a recalled one-word answer in full.
+  - **Repeats count less.** A correct answer to a question seen within a day counts about a third.
+  - **Old evidence fades** with a 45-day half-life, and **forgetting** is modelled between reviews: mastery shown to the learner is 90% of its peak when a review falls due.
+- **Adaptive policy** ([`lexinit/domain/mastery/policy.py`](./backend/lexinit/domain/mastery/policy.py)): a pure function that chooses one of seven actions. It asks for more evidence before labelling anyone, and only sends a learner back to prerequisites when mastery is actually low. Each decision is stored with **machine-readable reason codes** and the evidence IDs behind it.
+- **The response matches the size of the gap** ([`lexinit/services/concept_coach.py`](./backend/lexinit/services/concept_coach.py)): one wrong answer gets a fix-it card, a weak concept gets a new explanation and practice, and a full new course is the last resort. Coach questions keep their answers on the server until answered, and every answer becomes mastery evidence.
+- **Spaced review.** The next review date follows the mastery band (1, 3, 7, or 14 days), and a daily mix draws the due and weakest concepts from every course.
+- **One learner model across courses** ([`lexinit/services/learner_model.py`](./backend/lexinit/services/learner_model.py)): a concept already learnt in one course gives the same-named concept a head start in the next.
+- **Measured, not assumed.** [`scripts/evaluate_mastery.py`](./backend/scripts/evaluate_mastery.py) scores how well mastery predicts each learner's *next* answer. On 300 simulated learners it reaches a Brier score of 0.229 and AUC of 0.67, against 0.250 and 0.50 for always guessing 50% and 0.270 and 0.57 for a running average.
 - Both modules are pure Python with no I/O, sitting behind repository interfaces (`typing.Protocol`), so they can be tested in isolation.
 
 ### 4. Assessments are built to resist tampering
 
-- The client receives questions **without answers**. Correct answers stay in a private question bank on the server.
+- The client receives questions **without answers**, explanations, or misconception maps (which would reveal the answer by elimination). Correct answers stay in a private question bank on the server.
+- **AI-written answer keys are checked.** New questions are solved a second time without the key; a question whose key is disputed or ambiguous is dropped ([`lexinit/services/question_quality.py`](./backend/lexinit/services/question_quality.py)). Learners can report a question, which removes it from their future attempts.
+- **A pass has to be earned.** Answers are revealed after an attempt, so a reattempt gets new questions on the same concepts, weighted toward what the learner got wrong. The final assessment uses only unseen questions and has a 24-hour wait after a failed attempt.
 - An attempt is created server-side, **expires after two hours**, and each answer is saved against it.
 - Starting, answering, and finalising are **idempotent**: replaying a key returns the original result, and reusing a key for different data is rejected.
 - Finalising requires a signed submission token (compared in constant time), rejects incomplete, expired, mismatched, or foreign attempts, grades against the stored answers, and writes an **immutable submission**. Only then is mastery evidence recorded.
@@ -261,7 +271,12 @@ npm run build
 ```
 
 ```bash
-uv run --project backend python -m compileall -q backend
+cd backend
+uv run --group dev pytest                 # mastery, grading, limits, answer-key checks
+```
+
+```bash
+python -m backend.scripts.evaluate_mastery --simulate   # does mastery predict the next answer?
 ```
 
 ---
@@ -290,10 +305,13 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 
 These are stated openly so reviewers know where the edges are:
 
-- **No automated test suite yet.** The domain layer (grading, mastery, policy) is pure and dependency-free so it can be unit tested directly; adding pytest coverage there and CI on pull requests is the next priority.
+- **Tests cover the pure logic only.** Mastery, grading, rate limiting and answer-key checks have pytest coverage. The database-backed flows (attempts, quotas, final assessment, course deletion) were verified with scripted runs against a throwaway database but are not yet in the suite, and there is no CI.
+- **The mastery weights are judgement, not fitted.** They beat simple baselines on simulated learners; there is not yet enough real evidence to tune them.
+- **Practice is grounded in the module knowledge pack, not the study text.** Study materials and questions are written from the same knowledge pack, so they agree on facts, but a question can test a point the written material covered only briefly.
+- **No prompt caching.** Each generation call re-sends the curriculum and knowledge packs.
+- **Mastery carries over between courses only for concepts with the same name.**
 - **Source retrieval is lexical.** Feature-hashed term vectors capture shared vocabulary but not meaning. Swapping in real embeddings (for example Gemini embeddings with a vector index) is a contained change inside `document_learning.py`.
 - **Rate limiting needs Redis to be global.** Without `REDIS_URL`, the limiter is in memory, so with several Gunicorn workers each enforces its own budget.
-- **One-word answers use exact matching** after normalisation (case and trailing punctuation). Lecture knowledge checks already use fuzzy matching; the same could apply here.
 - **Waitlist signups are stored but not yet emailed or exported.**
 
 ---
