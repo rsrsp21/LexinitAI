@@ -4,6 +4,7 @@ import datetime
 import os
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 from typing import Any, TypedDict
 
 from bson import ObjectId
@@ -15,7 +16,10 @@ from backend.lexinit.schemas import Curriculum
 from backend.lexinit.schemas.knowledge import CourseKnowledgePacks
 from backend.lexinit.services import plan_curriculum
 from backend.services.generation_quota import release_quota_charge
+from backend.clients import get_gemini_model
 from backend.lexinit.services.knowledge_packs import build_knowledge_packs
+from backend.lexinit.services.practice_generation import generate_module_practice
+from backend.lexinit.services.question_quality import verify_answer_keys
 from backend.lexinit.services.learner_context import (
     learner_context_instruction,
     learner_context_snapshot,
@@ -24,13 +28,8 @@ from backend.session_store import find_cached_session, normalize_topic
 from backend.services.content_generation import (
     get_additional_resources_links,
     get_course_content,
-    get_flashcards,
+    generate_module_study_material,
     get_learningpath,
-    get_mcqs,
-    get_one_word_questions,
-    get_study_material_basic,
-    get_study_material_reasoning,
-    get_true_false_questions,
     moderate_content,
 )
 from backend.services.generation_runs import (
@@ -555,8 +554,38 @@ ARTIFACT_TASK_NAMES = (
 )
 
 
+MODULE_PRACTICE_FIELDS = ("flashcards", "mcqs", "true_false", "oneword")
+# Three course-wide tasks plus one study material and one practice set per module.
+INDEPENDENT_TASK_COUNT = 3
+
+
+def _material_step(module_id):
+    return f"module_material:{module_id}"
+
+
+def _practice_step(module_id):
+    return f"module_practice:{module_id}"
+
+
+def _answer_key_verifier(app, model_name):
+    """Model used to double-check answer keys: the fast coach model when one
+    is configured, otherwise the model that wrote the questions."""
+    coach_model = (app.config.get("GEMINI_COACH_MODEL_NAME") or "").strip()
+    main_model = model_name or app.config.get("GEMINI_MODEL_NAME")
+    if coach_model and coach_model != main_model:
+        return get_gemini_model(coach_model, [main_model] if main_model else [])
+    return get_gemini_model(model_name)
+
+
 def _generate_modules(app, job, curriculum, knowledge_packs, job_id):
-    subtopics = curriculum.subtopics
+    """Generate everything a course needs after its plan is fixed.
+
+    Each module is its own small pipeline: write the study material, then
+    write that module's flashcards and questions *from that material*. The
+    five modules run side by side with the course-wide tasks (video lectures,
+    learning path, resources). Every module stage is checkpointed, so a retry
+    only redoes what failed.
+    """
     grounding_context = (job.get("source_grounding") or {}).get("context")
     grounded_topic = (
         f"{job['topic']}\n\n{grounding_context}"
@@ -564,106 +593,13 @@ def _generate_modules(app, job, curriculum, knowledge_packs, job_id):
         else job["topic"]
     )
     packs_by_module = {pack.module_id: pack for pack in knowledge_packs.packs}
+    checkpoints = dict(job.get("checkpoints") or {})
 
     def with_context(fn, *args):
         with app.app_context():
             return fn(*args)
 
-    def study_materials():
-        if job["mode"] == "Pro Reasoning":
-            materials = with_context(
-                get_study_material_reasoning,
-                job["topic"],
-                subtopics,
-                job["difficulty_level"],
-                job.get("model_name"),
-                knowledge_packs,
-            )
-        else:
-            materials = with_context(
-                get_study_material_basic,
-                job["topic"],
-                subtopics,
-                job.get("model_name"),
-                knowledge_packs,
-            )
-        for index, material in enumerate(materials):
-            if not isinstance(material, dict) or index >= len(curriculum.modules):
-                continue
-            module = curriculum.modules[index]
-            material.update(
-                {
-                    "curriculum_id": curriculum.curriculum_id,
-                    "module_id": module.module_id,
-                    "concept_ids": [concept.concept_id for concept in module.concepts],
-                    "objective_ids": [
-                        objective.objective_id for objective in module.learning_objectives
-                    ],
-                    "difficulty": curriculum.difficulty.value,
-                    "generation_kind": "standard",
-                    "knowledge_pack_id": packs_by_module[module.module_id].knowledge_pack_id,
-                    "knowledge_pack_version": knowledge_packs.prompt_version,
-                    "grounding_refs": list(packs_by_module[module.module_id].source_references),
-                    "prompt_version": "study-material-pack-v1",
-                    "validation_status": "validated",
-                }
-            )
-        return materials
-
-    tasks = {
-        "study_materials": (
-            study_materials,
-            "materials",
-            "Preparing Study Materials.",
-        ),
-        "flashcards": (
-            lambda: with_context(
-                get_flashcards,
-                job["topic"],
-                job["difficulty_level"],
-                job.get("model_name"),
-                curriculum,
-                knowledge_packs,
-            ),
-            "practice",
-            "Preparing Flashcards.",
-        ),
-        "mcqs": (
-            lambda: with_context(
-                get_mcqs,
-                job["topic"],
-                job["difficulty_level"],
-                job.get("model_name"),
-                curriculum,
-                knowledge_packs,
-            ),
-            "practice",
-            "Preparing Assessments.",
-        ),
-        "true_false": (
-            lambda: with_context(
-                get_true_false_questions,
-                job["topic"],
-                job["difficulty_level"],
-                job.get("model_name"),
-                curriculum,
-                knowledge_packs,
-            ),
-            "practice",
-            "Preparing Assessments.",
-        ),
-        "oneword": (
-            lambda: with_context(
-                get_one_word_questions,
-                job["topic"],
-                job["difficulty_level"],
-                job.get("model_name"),
-                curriculum,
-                knowledge_packs,
-            ),
-            "practice",
-            "Preparing Assessments.",
-        ),
+    independent = {
         "course_content": (
             lambda: with_context(
                 get_course_content,
@@ -692,49 +628,194 @@ def _generate_modules(app, job, curriculum, knowledge_packs, job_id):
             "Preparing Additional Resources.",
         ),
     }
-
-    completed = set(job.get("completed_steps", []))
-    pending = {
+    pending_independent = {
         name: task
-        for name, task in tasks.items()
-        if f"artifact:{name}" not in completed
-        or job.get("checkpoints", {}).get(f"artifact:{name}") is None
+        for name, task in independent.items()
+        if checkpoints.get(f"artifact:{name}") is None
     }
-    if not pending:
-        return
 
-    total = len(tasks)
-    done_count = total - len(pending)
+    # Runs started before per-module checkpoints stored whole-course artifacts.
+    practice_assembled = all(
+        checkpoints.get(f"artifact:{name}") is not None for name in MODULE_PRACTICE_FIELDS
+    )
+    legacy_materials = {
+        item.get("module_id"): item
+        for item in checkpoints.get("artifact:study_materials") or []
+        if isinstance(item, dict)
+    }
+
+    def saved_material(module):
+        return checkpoints.get(_material_step(module.module_id)) or legacy_materials.get(module.module_id)
+
+    module_plans = []
+    for module in curriculum.modules:
+        needs_material = saved_material(module) is None
+        needs_practice = (
+            not practice_assembled and checkpoints.get(_practice_step(module.module_id)) is None
+        )
+        if needs_material or needs_practice:
+            module_plans.append((module, needs_material, needs_practice))
+
+    total = INDEPENDENT_TASK_COUNT + 2 * len(curriculum.modules)
+    remaining = len(pending_independent) + sum(
+        int(needs_material) + int(needs_practice) for _, needs_material, needs_practice in module_plans
+    )
+    progress_state = {"done": total - remaining}
+    progress_lock = Lock()
+
+    def advance(stage, message):
+        with progress_lock:
+            progress_state["done"] += 1
+            progress = 32 + int((progress_state["done"] / total) * 58)
+        update_generation_run(job_id, stage=stage, progress=progress, message=message)
+
+    def check_cancelled():
+        latest = get_generation_run(job_id)
+        if latest and (latest.get("cancel_requested") or latest.get("status") == "cancelled"):
+            raise GenerationCancelled()
+
+    def module_pipeline(module, needs_material, needs_practice):
+        with app.app_context():
+            pack = packs_by_module[module.module_id]
+            material = saved_material(module)
+            if needs_material:
+                check_cancelled()
+                try:
+                    text = generate_module_study_material(
+                        job["topic"],
+                        module.title,
+                        job["difficulty_level"],
+                        job["mode"],
+                        job.get("model_name"),
+                        pack,
+                    )
+                except Exception as exc:
+                    raise GenerationStepFailed(_material_step(module.module_id), exc) from exc
+                material = {
+                    "subtopic": module.title,
+                    "study_material": text,
+                    "curriculum_id": curriculum.curriculum_id,
+                    "module_id": module.module_id,
+                    "concept_ids": [concept.concept_id for concept in module.concepts],
+                    "objective_ids": [
+                        objective.objective_id for objective in module.learning_objectives
+                    ],
+                    "difficulty": curriculum.difficulty.value,
+                    "generation_kind": "standard",
+                    "knowledge_pack_id": pack.knowledge_pack_id,
+                    "knowledge_pack_version": knowledge_packs.prompt_version,
+                    "grounding_refs": list(pack.source_references),
+                    "prompt_version": "study-material-pack-v1",
+                    "validation_status": "validated",
+                }
+                complete_step(job_id, _material_step(module.module_id), material)
+                advance("materials", "Preparing Study Materials.")
+            if needs_practice:
+                check_cancelled()
+                try:
+                    verifier = _answer_key_verifier(app, job.get("model_name"))
+                    practice = generate_module_practice(
+                        get_gemini_model(job.get("model_name")),
+                        curriculum,
+                        module,
+                        pack,
+                        str(material.get("study_material") or ""),
+                        verify=lambda questions: verify_answer_keys(verifier, questions),
+                    )
+                except Exception as exc:
+                    raise GenerationStepFailed(_practice_step(module.module_id), exc) from exc
+                complete_step(job_id, _practice_step(module.module_id), practice)
+                advance("practice", "Preparing Flashcards and Assessments.")
+
     errors: list[tuple[str, Exception]] = []
-    with ThreadPoolExecutor(max_workers=4) as module_executor:
-        futures = {
-            module_executor.submit(fn): (name, stage, message)
-            for name, (fn, stage, message) in pending.items()
-        }
-        for future in as_completed(futures):
-            name, stage, message = futures[future]
-            latest = get_generation_run(job_id)
-            if latest and latest.get("cancel_requested"):
-                raise GenerationCancelled()
-            try:
-                result = future.result()
-                _validate_artifact_alignment(name, result, curriculum, knowledge_packs)
-                complete_step(job_id, f"artifact:{name}", result)
-                done_count += 1
-                progress = 32 + int((done_count / total) * 58)
-                update_generation_run(
-                    job_id,
-                    stage=stage,
-                    progress=progress,
-                    message=message,
-                )
-            except Exception as exc:
-                mark_step_failed(job_id, f"artifact:{name}")
-                errors.append((f"artifact:{name}", exc))
+    cancelled = False
+    if pending_independent or module_plans:
+        with ThreadPoolExecutor(max_workers=8) as module_executor:
+            futures = {}
+            for module, needs_material, needs_practice in module_plans:
+                future = module_executor.submit(module_pipeline, module, needs_material, needs_practice)
+                futures[future] = ("module", None, None)
+            for name, (fn, stage, message) in pending_independent.items():
+                futures[module_executor.submit(fn)] = (name, stage, message)
 
+            for future in as_completed(futures):
+                name, stage, message = futures[future]
+                try:
+                    result = future.result()
+                    if name != "module":
+                        _validate_artifact_alignment(name, result, curriculum, knowledge_packs)
+                        complete_step(job_id, f"artifact:{name}", result)
+                        advance(stage, message)
+                except GenerationCancelled:
+                    cancelled = True
+                except GenerationStepFailed as exc:
+                    mark_step_failed(job_id, exc.step)
+                    errors.append((exc.step, exc.cause))
+                except Exception as exc:
+                    step = f"artifact:{name}"
+                    mark_step_failed(job_id, step)
+                    errors.append((step, exc))
+
+    if cancelled:
+        raise GenerationCancelled()
+    latest = get_generation_run(job_id)
+    if latest and (latest.get("cancel_requested") or latest.get("status") == "cancelled"):
+        raise GenerationCancelled()
     if errors:
         step, error = errors[0]
         raise GenerationStepFailed(step, error)
+
+    _assemble_module_artifacts(job_id, curriculum, knowledge_packs)
+
+
+def _assemble_module_artifacts(job_id, curriculum, knowledge_packs):
+    """Combine the per-module checkpoints into the course-level artifacts the
+    saved course uses, validating that every module is complete and aligned."""
+    checkpoints = (get_generation_run(job_id) or {}).get("checkpoints") or {}
+
+    if checkpoints.get("artifact:study_materials") is None:
+        materials = [
+            checkpoints.get(_material_step(module.module_id)) for module in curriculum.modules
+        ]
+        if any(item is None for item in materials):
+            raise GenerationStepFailed(
+                "study_materials", RuntimeError("A module is missing its Study Material.")
+            )
+        try:
+            _validate_artifact_alignment("study_materials", materials, curriculum, knowledge_packs)
+        except ValueError as exc:
+            raise GenerationStepFailed("study_materials", exc) from exc
+        complete_step(job_id, "artifact:study_materials", materials)
+
+    if all(checkpoints.get(f"artifact:{name}") is not None for name in MODULE_PRACTICE_FIELDS):
+        return
+    assembled = {name: [] for name in MODULE_PRACTICE_FIELDS}
+    for module in curriculum.modules:
+        practice = checkpoints.get(_practice_step(module.module_id))
+        if not isinstance(practice, dict):
+            raise GenerationStepFailed(
+                _practice_step(module.module_id),
+                RuntimeError("A module is missing its practice set."),
+            )
+        for name in MODULE_PRACTICE_FIELDS:
+            assembled[name].extend(practice.get(name) or [])
+    try:
+        for name in MODULE_PRACTICE_FIELDS:
+            _validate_artifact_alignment(name, assembled[name], curriculum, knowledge_packs)
+    except ValueError as exc:
+        # For example two modules wrote the same question. Clear the module
+        # practice so a retry writes it again instead of failing the same way.
+        steps = [_practice_step(module.module_id) for module in curriculum.modules]
+        mongo.db.generation_runs.update_one(
+            {"_id": job_id},
+            {
+                "$unset": {f"checkpoints.{step}": "" for step in steps},
+                "$pull": {"completed_steps": {"$in": steps}},
+            },
+        )
+        raise GenerationStepFailed("flashcards", exc) from exc
+    for name in MODULE_PRACTICE_FIELDS:
+        complete_step(job_id, f"artifact:{name}", assembled[name])
 
 
 def _validate_artifact_alignment(name, result, curriculum, knowledge_packs):
@@ -864,6 +945,10 @@ def _public_step_error(step):
 
 
 def _public_step_label(step):
+    if str(step).startswith("module_material:"):
+        return "Study Materials"
+    if str(step).startswith("module_practice:"):
+        return "Flashcards and Assessments"
     return {
         "curriculum": "the Learning Path",
         "study_materials": "Study Materials",

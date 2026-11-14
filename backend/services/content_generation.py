@@ -228,6 +228,48 @@ def get_study_material_basic(topic, subtopics, model_name=None, knowledge_packs:
     return study_materials
 
 
+MIN_STUDY_MATERIAL_CHARS = 400
+
+
+def generate_module_study_material(
+    topic,
+    subtopic,
+    difflvl,
+    mode,
+    model_name=None,
+    pack=None,
+):
+    """Write the study material for one module and return its text.
+
+    Raises when the model returns nothing usable, so a module can never be
+    saved without its material.
+    """
+    pack_section = (
+        f"\nAuthoritative module knowledge pack:\n{pack.model_dump_json()}\n"
+        "Use it as the factual source of truth. Explain every definition and important fact in it."
+        if pack
+        else ""
+    )
+    difficulty_line = f"Difficulty: {difflvl}. " if mode == "Pro Reasoning" else ""
+    prompt = (
+        "This is an API call for generating study material. "
+        f"{untrusted_topic_block(topic)}\n"
+        f"Subtopic (JSON string): {json.dumps(str(subtopic), ensure_ascii=False)}\n"
+        f"{difficulty_line}Give a clear and detailed explanation."
+        f"{pack_section}"
+        "Ensure clarity and conciseness while maintaining a professional and educational tone."
+        "Just give like study material, and don't use words like certainly, here's a, or I hope, this material provides, any response intros, etc. "
+        "(If there are any math functions or formulae required in material, give them in MathJax v3 format only, otherwise ignore.)"
+    )
+    response = _generate(prompt, model_name)
+    text = (getattr(response, "text", None) or "").strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    text = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    if len(text) < MIN_STUDY_MATERIAL_CHARS:
+        raise RuntimeError(f"Study material for {subtopic!r} came back empty or too short.")
+    return text
+
+
 def get_subtopics_course(topic, difflvl, model_name=None):
     return list(_get_subtopics_course_cached(topic, difflvl, model_name))
 

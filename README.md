@@ -59,7 +59,9 @@ prepare (safety check, reuse a matching course) → curriculum → knowledge pac
 
 Separate LLM calls for notes, flashcards, and quizzes tend to drift apart. Lexinit first generates a **curriculum** (exactly five modules, each with concepts and measurable objectives) and then one **knowledge pack** per module: definitions, facts, examples, common mistakes, difficulty boundaries, source references, and video search terms.
 
-Every artifact is generated *from* those packs and then **checked against them** before it is accepted. Each artifact carries **lineage** (curriculum, module, concept, and objective IDs, plus pack and prompt versions), so any question or card can be traced back to the objective it tests. IDs are derived from stable hashes, so the same plan produces the same IDs.
+Each module then runs as its own small pipeline: its **study material** is written from the pack, and its flashcards and questions are written **from that study material**, so practice only tests what the learner was actually taught. The five modules run in parallel and each stage is checkpointed, so a failure retries one module instead of the whole course. Every question's answer key is checked by an independent solve before it is accepted, with one spare question per type so a disputed one can be dropped.
+
+Every artifact is **checked against the plan** before it is accepted. Each artifact carries **lineage** (curriculum, module, concept, and objective IDs, plus pack and prompt versions), so any question or card can be traced back to the objective it tests. IDs are derived from stable hashes, so the same plan produces the same IDs.
 
 ### 3. AI creates content; deterministic code makes decisions
 
@@ -307,8 +309,8 @@ These are stated openly so reviewers know where the edges are:
 
 - **Tests cover the pure logic only.** Mastery, grading, rate limiting and answer-key checks have pytest coverage. The database-backed flows (attempts, quotas, final assessment, course deletion) were verified with scripted runs against a throwaway database but are not yet in the suite, and there is no CI.
 - **The mastery weights are judgement, not fitted.** They beat simple baselines on simulated learners; there is not yet enough real evidence to tune them.
-- **Practice is grounded in the module knowledge pack, not the study text.** Study materials and questions are written from the same knowledge pack, so they agree on facts, but a question can test a point the written material covered only briefly.
-- **No prompt caching.** Each generation call re-sends the curriculum and knowledge packs.
+- **Grounding in the study text is by instruction, not measured.** Questions are written with the module's study material in the prompt and told to test only what it explains; there is no automatic check that each answer appears in the text.
+- **No explicit prompt caching.** Each module call now sends only its own module's context, which removed most repeated input; the shared context is placed first in the prompt, but no cache is created explicitly.
 - **Mastery carries over between courses only for concepts with the same name.**
 - **Source retrieval is lexical.** Feature-hashed term vectors capture shared vocabulary but not meaning. Swapping in real embeddings (for example Gemini embeddings with a vector index) is a contained change inside `document_learning.py`.
 - **Rate limiting needs Redis to be global.** Without `REDIS_URL`, the limiter is in memory, so with several Gunicorn workers each enforces its own budget.
