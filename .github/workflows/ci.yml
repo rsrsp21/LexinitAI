@@ -11,8 +11,13 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (lint and tests)
+    name: Backend (lint and tests, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported version and the one used in development.
+        python: ["3.11", "3.12"]
     services:
       mongo:
         image: mongo:7
@@ -35,11 +40,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
       - name: Install Python
-        run: uv python install 3.12
+        run: uv python install ${{ matrix.python }}
       - name: Install dependencies
-        run: uv sync --python 3.12 --group dev --frozen
+        run: uv sync --python ${{ matrix.python }} --group dev --frozen
       - name: Lint
-        run: uv run --with ruff ruff check --select F,E9 --target-version py310 .
+        run: uv run --with ruff ruff check --select F,E9 --target-version py311 .
       - name: Tests
         run: uv run --group dev pytest -q -rs
       - name: Mastery estimate beats the baselines

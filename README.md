@@ -180,7 +180,7 @@ flowchart LR
 | Area | Technology |
 | --- | --- |
 | Frontend | React 19, TypeScript, Vite, TanStack Router (type-safe, file-based routes), TanStack Query, Tailwind CSS 4, Radix UI, Motion, Recharts, React Markdown + KaTeX, Zod, Lenis |
-| Backend | Python 3.10+, Flask, Pydantic v2, LangGraph, RQ, Flask-Mail, Gunicorn, managed with `uv` |
+| Backend | Python 3.11+, Flask, Pydantic v2, LangGraph, RQ, Flask-Mail, Gunicorn, managed with `uv` |
 | Data | MongoDB (with schema validation and indexes); Redis for the production job queue |
 | AI and search | Google Gemini (structured JSON output), YouTube Data API, youtube-transcript-api, Google Custom Search |
 | Documents | PyMuPDF / PyMuPDF4LLM, Google Cloud Vision OCR |
@@ -214,7 +214,7 @@ docs/                      Architecture, backend, frontend, runbook, design syst
 
 ## Running locally
 
-**Prerequisites:** Python 3.10+, [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js, MongoDB (local or Atlas), and API keys for Gemini and the YouTube Data API.
+**Prerequisites:** Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js, MongoDB (local or Atlas), and API keys for Gemini and the YouTube Data API.
 
 ### Backend
 
@@ -274,7 +274,7 @@ npm run build
 
 ```bash
 cd backend
-uv run --group dev pytest                 # 77 tests; the database-backed ones need MongoDB and are skipped without it
+uv run --group dev pytest                 # 84 tests; the database-backed ones need MongoDB and are skipped without it
 ```
 
 ```bash
@@ -309,7 +309,7 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 
 These are stated openly so reviewers know where the edges are:
 
-- **Generation itself is not in the automated suite.** The 77 tests cover mastery, grading, limits, answer-key checks, module practice, and (against a throwaway MongoDB) assessment attempts, plan quotas, the final assessment, boosters and course deletion. Creating a course calls the model, so it is verified by scripted runs rather than in CI.
+- **The model itself is not tested in CI.** The 84 tests run the real orchestrator, checkpoints, validation, quotas and routes (against a throwaway MongoDB), with the model and web calls replaced by stand-ins. They prove a course is assembled, retried and cancelled correctly; the quality of what the model writes is checked by scripted runs against the real model.
 - **The mastery weights are judgement, not fitted.** They beat simple baselines on simulated learners; there is not yet enough real evidence to tune them.
 - **Grounding in the study text is by instruction, not measured.** Questions are written with the module's study material in the prompt and told to test only what it explains; there is no automatic check that each answer appears in the text.
 - **No explicit prompt caching.** Each module call now sends only its own module's context, which removed most repeated input; the shared context is placed first in the prompt, but no cache is created explicitly.
