@@ -725,9 +725,9 @@ function ProfilePage() {
                     <h2 className="font-display text-2xl tracking-tight">Plan</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {user?.plan === "pro"
-                        ? "Pro — unlimited course generations."
+                        ? "Pro — 100 Quick and 30 Deep Focus course generations per 24 hours."
                         : user?.plan === "plus"
-                          ? "Plus — up to 20 course generations per 24 hours."
+                          ? "Plus — 20 Quick and 10 Deep Focus course generations per 24 hours."
                           : "Free — 5 Quick and 3 Deep Focus course generations per 24 hours."}
                     </p>
                   </div>

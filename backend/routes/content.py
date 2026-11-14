@@ -1,4 +1,3 @@
-import datetime
 import re
 import uuid
 
@@ -10,6 +9,10 @@ from backend.lexinit.api.validation import GENERATION_FIELD_MESSAGES, parse_json
 from backend.lexinit.schemas import GenerationRequest, GenerationV1Request
 from backend.lexinit.services.learner_context import learner_context_snapshot
 from backend.routes.sources import source_service
+from backend.services.generation_quota import (
+    consume_generation_quota,
+    release_quota_charge,
+)
 from backend.services.generation_jobs import (
     cancel_generation_job,
     enqueue_generation_job,
@@ -100,7 +103,7 @@ def register_routes(app):
                 }
             )
 
-        rate_limit_response = ensure_generation_quota(user_id, user_doc, mode=mode)
+        rate_limit_response, quota_charge = consume_generation_quota(user_id, user_doc, mode=mode)
         if rate_limit_response:
             return rate_limit_response
 
@@ -115,6 +118,7 @@ def register_routes(app):
             adaptive_source=adaptive_source,
             source_grounding=grounding,
             idempotency_key=generation_idempotency_key(),
+            quota_charge=quota_charge,
         )
         return generation_started_response(job)
 
@@ -141,7 +145,7 @@ def register_routes(app):
         if not topic or not difflvl:
             return jsonify({"success": False, "message": "This session is missing topic or difficulty details."}), 400
 
-        rate_limit_response = ensure_generation_quota(user_id, user_doc, mode=mode)
+        rate_limit_response, quota_charge = consume_generation_quota(user_id, user_doc, mode=mode)
         if rate_limit_response:
             return rate_limit_response
 
@@ -163,6 +167,7 @@ def register_routes(app):
             version=next_version,
             source_grounding=grounding,
             idempotency_key=generation_idempotency_key(),
+            quota_charge=quota_charge,
         )
         job["message"] = (
             job["message"] if job.get("deduplicated") else f"Creating version {next_version}."
@@ -216,21 +221,20 @@ def register_routes(app):
         if not user_doc:
             return jsonify({"message": "User not found."}), 404
         retry_mode = existing.get("mode") or "Basic"
-        rate_limit_response = ensure_generation_quota(
+        rate_limit_response, quota_charge = consume_generation_quota(
             session["user_id"], user_doc, mode=retry_mode
         )
         if rate_limit_response:
             return rate_limit_response
         job = retry_generation_job(
-            current_app._get_current_object(), job_id, session["user_id"]
+            current_app._get_current_object(),
+            job_id,
+            session["user_id"],
+            quota_charge=quota_charge,
         )
         if not job:
             # Retry was rejected; return the quota slot consumed above.
-            counter = "deep_rate_limit" if retry_mode == DEEP_FOCUS_MODE else "rate_limit"
-            mongo.db.users.update_one(
-                {"_id": ObjectId(session["user_id"]), counter: {"$gt": 0}},
-                {"$inc": {counter: -1}},
-            )
+            release_quota_charge(session["user_id"], quota_charge)
             return jsonify(
                 {
                     "success": False,
@@ -238,98 +242,6 @@ def register_routes(app):
                 }
             ), 409
         return jsonify({"success": True, **job}), 202
-
-
-# Generations allowed per 24-hour window, by plan. None means unlimited.
-PLAN_GENERATION_LIMITS = {
-    "free": 5,
-    "plus": 20,
-    "pro": None,
-}
-
-# Deep Focus (Pro Reasoning) generations allowed per 24-hour window, by plan.
-# Deep Focus has its own separate budget and does NOT consume the quick
-# (Basic) generation limit. None means unlimited.
-PLAN_DEEP_FOCUS_LIMITS = {
-    "free": 3,
-    "plus": None,
-    "pro": None,
-}
-
-DEEP_FOCUS_MODE = "Pro Reasoning"
-
-
-def _plan_limit(user_doc, config_key, defaults):
-    plan = str(user_doc.get("plan") or "free").strip().lower()
-    limits = current_app.config.get(config_key) or defaults
-    if plan in limits:
-        return limits[plan]
-    return limits.get("free")
-
-
-def generation_limit_for(user_doc):
-    return _plan_limit(user_doc, "PLAN_GENERATION_LIMITS", PLAN_GENERATION_LIMITS)
-
-
-def deep_focus_limit_for(user_doc):
-    return _plan_limit(user_doc, "PLAN_DEEP_FOCUS_LIMITS", PLAN_DEEP_FOCUS_LIMITS)
-
-
-def ensure_generation_quota(user_id, user_doc, mode=None):
-    """Atomically consume one generation from the user's 24-hour quota.
-
-    Deep Focus (Pro Reasoning) generations additionally consume a
-    deep-focus slot, which has its own per-plan limit. Counters are
-    incremented here (before generation starts) with conditional updates,
-    so concurrent requests cannot exceed the limits. On terminal
-    generation failure the charge is refunded once
-    (see backend.services.generation_jobs.refund_generation_quota).
-    """
-    is_deep = mode == DEEP_FOCUS_MODE
-    limit = deep_focus_limit_for(user_doc) if is_deep else generation_limit_for(user_doc)
-    if limit is None:
-        return None  # unlimited for this mode on this plan
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-    window = datetime.timedelta(hours=24)
-    first_time = user_doc.get("first_submission_time")
-    if first_time and first_time.tzinfo is None:
-        first_time = first_time.replace(tzinfo=datetime.timezone.utc)
-
-    counter = "deep_rate_limit" if is_deep else "rate_limit"
-
-    if not first_time or now - first_time >= window:
-        # New window: reset both budgets and consume the first slot.
-        mongo.db.users.update_one(
-            {"_id": ObjectId(user_id)},
-            {
-                "$set": {
-                    "first_submission_time": now,
-                    "rate_limit": 0 if is_deep else 1,
-                    "deep_rate_limit": 1 if is_deep else 0,
-                }
-            },
-        )
-        return None
-
-    # Within the window: consume a slot only if this mode's limit allows it.
-    result = mongo.db.users.update_one(
-        {"_id": ObjectId(user_id), counter: {"$lt": limit}},
-        {"$inc": {counter: 1}},
-    )
-    if result.modified_count == 0:
-        remaining = window - (now - first_time)
-        hours = remaining.seconds // 3600
-        minutes = (remaining.seconds % 3600) // 60
-        if is_deep:
-            message = (
-                f"Deep Focus limit reached ({limit} per 24 hours). "
-                f"Try Quick mode, or try Deep Focus again in {hours}h {minutes}m."
-            )
-        else:
-            message = f"Rate limit exceeded. Try again in {hours}h {minutes}m."
-        return jsonify({"success": False, "message": message}), 429
-    return None
 
 
 def generation_idempotency_key():

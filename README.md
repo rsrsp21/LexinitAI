@@ -52,7 +52,7 @@ prepare (safety check, reuse a matching course) → curriculum → knowledge pac
 - **Pluggable execution.** `GENERATION_WORKER_MODE=auto` uses an **RQ/Redis** queue when Redis is configured and falls back to an in-process thread pool otherwise. The same code runs in development and production.
 - **Parallel artifacts.** The eight artifact families are generated concurrently (thread pool of four), and cancellation is checked as each one finishes.
 - **All or nothing.** A course is inserted only after every artifact passes validation, so learners never see a half-built course.
-- **Fair quotas.** Daily generation limits are consumed with conditional atomic updates, so concurrent requests cannot exceed them. They are **refunded** if a run fails or is cancelled.
+- **Fair quotas.** Daily generation limits are consumed with conditional atomic updates, so concurrent requests cannot exceed them or open the 24-hour window twice. Each run records the charge it took, so a failed or cancelled run is **refunded** exactly once, and only within the window it was charged to.
 
 ### 2. One plan per module keeps every artifact consistent
 
@@ -102,7 +102,7 @@ Prompts for the curriculum, knowledge packs, and practice questions ask Gemini f
 
 - **Sessions and CSRF:** server-side sessions stored in MongoDB, and CSRF tokens on every state-changing request from a signed-in user.
 - **Headers:** a strict Content Security Policy and other security headers.
-- **Rate limits:** a sliding-window limiter, with separate budgets for uploads, generation, assessments, and waitlist signups.
+- **Rate limits:** a sliding-window limiter, shared through Redis when `REDIS_URL` is set (in-process otherwise), with separate budgets for uploads, generation starts (including regenerate and retry), assessments, and waitlist signups. Login, signup and password-reset routes are limited per client address and per target email, against password guessing and email flooding.
 - **Ownership:** checked on every course, source, attempt, and run, and all request bodies are validated by Pydantic.
 - **Observability:** OpenTelemetry tracing, request IDs, liveness and readiness probes, and token-protected metrics and alert endpoints (error rate, p95 latency, database health).
 - **Tooling:** encrypted **AES-256-GCM** database backups with restore verification, an additive migration script with a dry-run mode, and a load-test gate that fails above 1% errors or 1.5 s p95 latency.
@@ -281,6 +281,8 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 | `REDIS_URL`, `GENERATION_WORKER_MODE` | Job queue (`auto`, `rq`, or `local`) |
 | `MAIL_*`, `MAIL_SUPPRESS_SEND` | Verification and reset emails (suppressed mode prints codes to the console) |
 | `METRICS_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Protected metrics and alerts, trace export |
+| `LOGIN_RATE_LIMIT`, `AUTH_CODE_SEND_RATE_LIMIT`, `AUTH_CODE_VERIFY_RATE_LIMIT` | Throttles for sign-in, sending codes, and checking codes |
+| `TRUSTED_PROXY_COUNT` | Reverse proxies in front of the app, so limits apply per real client address |
 
 ---
 
@@ -290,7 +292,7 @@ These are stated openly so reviewers know where the edges are:
 
 - **No automated test suite yet.** The domain layer (grading, mastery, policy) is pure and dependency-free so it can be unit tested directly; adding pytest coverage there and CI on pull requests is the next priority.
 - **Source retrieval is lexical.** Feature-hashed term vectors capture shared vocabulary but not meaning. Swapping in real embeddings (for example Gemini embeddings with a vector index) is a contained change inside `document_learning.py`.
-- **Rate limiting is per process.** The sliding-window limiter is in memory, so with several Gunicorn workers each enforces its own budget. Moving it to Redis would make limits global.
+- **Rate limiting needs Redis to be global.** Without `REDIS_URL`, the limiter is in memory, so with several Gunicorn workers each enforces its own budget.
 - **One-word answers use exact matching** after normalisation (case and trailing punctuation). Lecture knowledge checks already use fuzzy matching; the same could apply here.
 - **Waitlist signups are stored but not yet emailed or exported.**
 

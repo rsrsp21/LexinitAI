@@ -71,6 +71,12 @@ class Config:
     SOURCE_UPLOAD_RATE_LIMIT = int(os.environ.get("SOURCE_UPLOAD_RATE_LIMIT", 15))
     GENERATION_START_RATE_LIMIT = int(os.environ.get("GENERATION_START_RATE_LIMIT", 10))
     WAITLIST_RATE_LIMIT = int(os.environ.get("WAITLIST_RATE_LIMIT", 10))
+    COACH_RATE_LIMIT = int(os.environ.get("COACH_RATE_LIMIT", 60))
+    LOGIN_RATE_LIMIT = int(os.environ.get("LOGIN_RATE_LIMIT", 10))
+    AUTH_CODE_SEND_RATE_LIMIT = int(os.environ.get("AUTH_CODE_SEND_RATE_LIMIT", 5))
+    AUTH_CODE_VERIFY_RATE_LIMIT = int(os.environ.get("AUTH_CODE_VERIFY_RATE_LIMIT", 10))
+    # Number of reverse proxies in front of the app (0 when exposed directly).
+    TRUSTED_PROXY_COUNT = int(os.environ.get("TRUSTED_PROXY_COUNT", 0))
     METRICS_TOKEN = os.environ.get("METRICS_TOKEN")
     OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     ALERT_WINDOW_SECONDS = int(os.environ.get("ALERT_WINDOW_SECONDS", 300))
@@ -93,6 +99,7 @@ class Config:
     PASSWORD_RESET_MAX_CODE_ATTEMPTS = int(os.environ.get("PASSWORD_RESET_MAX_CODE_ATTEMPTS", 5))
 
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    GEMINI_USE_VERTEX = os.environ.get("GEMINI_USE_VERTEX", "false").strip().lower() in {"1", "true", "yes", "on"}
     YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
     CLOUD_VISION_API_KEY = os.environ.get("CLOUD_VISION_API_KEY")
     CUSTOM_SEARCH_API = os.environ.get("CUSTOM_SEARCH_API")
@@ -100,6 +107,7 @@ class Config:
     GOOGLE_CREDENTIALS_BASE64 = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
 
     GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+    GEMINI_COACH_MODEL_NAME = os.environ.get("GEMINI_COACH_MODEL_NAME")
     GEMINI_DEEP_FOCUS_MODEL_NAME = os.environ.get("GEMINI_DEEP_FOCUS_MODEL_NAME", "gemini-2.5-pro")
 
     CORS_ORIGINS = [

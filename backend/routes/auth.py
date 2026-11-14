@@ -11,8 +11,20 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from backend.extensions import mail, mongo
 from backend.lexinit.schemas.profile import ProfileType, ProfileUpdateRequest
+from backend.lexinit.security import enforce_rate_limit
 
 EMAIL_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
+
+
+def _limit_per_email(bucket, email, config_key, default, window_seconds):
+    """Throttle by target email as well as by client address, so a
+    distributed attacker cannot hammer one account or inbox."""
+    enforce_rate_limit(
+        bucket,
+        email,
+        limit=int(current_app.config.get(config_key, default)),
+        window_seconds=window_seconds,
+    )
 
 
 def generate_verification_code(length=4):
@@ -286,6 +298,7 @@ def register_routes(app):
         email_error = _validate_email(email)
         if email_error:
             return jsonify(success=False, message=email_error)
+        _limit_per_email("email-send-code", email, "AUTH_CODE_SEND_RATE_LIMIT", 5, 60 * 60)
 
         if mongo.db.users.find_one({"email": email}):  # type: ignore
             return jsonify(success=False, message="Email already exists. Please sign in.")
@@ -507,6 +520,7 @@ def register_routes(app):
         email_error = _validate_email(email)
         if email_error:
             return jsonify(success=False, message=email_error)
+        _limit_per_email("email-send-code", email, "AUTH_CODE_SEND_RATE_LIMIT", 5, 60 * 60)
         name_error = _validate_name(name)
         if name_error:
             return jsonify(success=False, message=name_error)
@@ -613,6 +627,7 @@ def register_routes(app):
         email_error = _validate_email(email)
         if email_error:
             return jsonify(success=False, message=email_error)
+        _limit_per_email("email-login", email, "LOGIN_RATE_LIMIT", 10, 15 * 60)
 
         user = mongo.db.users.find_one({"email": email})  # type: ignore
 
@@ -649,6 +664,7 @@ def register_routes(app):
         email_error = _validate_email(email)
         if email_error:
             return jsonify(success=False, message=email_error), 400
+        _limit_per_email("email-send-code", email, "AUTH_CODE_SEND_RATE_LIMIT", 5, 60 * 60)
 
         user = mongo.db.users.find_one({"email": email})
         if not user:

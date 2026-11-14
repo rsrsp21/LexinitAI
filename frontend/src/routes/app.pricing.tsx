@@ -31,9 +31,9 @@ function PricingPage() {
       featured: true,
       features: [
         "Full access to all features",
-        "Limited to 20 generations for 24 hours",
+        "20 Quick generations per 24 hours",
         "Priority support",
-        "Deep focus mode with advanced AI",
+        "10 Deep Focus generations per 24 hours",
       ],
     },
     {
@@ -44,9 +44,9 @@ function PricingPage() {
       available: false,
       features: [
         "Access to all learning content",
-        "Unlimited Generations",
+        "100 Quick generations per 24 hours",
         "Exclusive support",
-        "Deep focus mode with advanced AI",
+        "30 Deep Focus generations per 24 hours",
       ],
     },
   ];

@@ -14,6 +14,7 @@ from backend.extensions import mongo
 from backend.lexinit.schemas import Curriculum
 from backend.lexinit.schemas.knowledge import CourseKnowledgePacks
 from backend.lexinit.services import plan_curriculum
+from backend.services.generation_quota import release_quota_charge
 from backend.lexinit.services.knowledge_packs import build_knowledge_packs
 from backend.lexinit.services.learner_context import (
     learner_context_instruction,
@@ -69,14 +70,12 @@ def refund_generation_quota(job_id):
     )
     if marked.modified_count == 0:
         return  # already refunded for this run
-    run = mongo.db.generation_runs.find_one({"_id": job_id}, {"user_id": 1, "mode": 1})
+    run = mongo.db.generation_runs.find_one({"_id": job_id}, {"user_id": 1, "quota_charge": 1})
     if not run or not run.get("user_id"):
         return
-    counter = "deep_rate_limit" if run.get("mode") == "Pro Reasoning" else "rate_limit"
-    mongo.db.users.update_one(
-        {"_id": run["user_id"], counter: {"$gt": 0}},
-        {"$inc": {counter: -1}},
-    )
+    # Only the recorded charge is returned, and only within the window it was
+    # taken from. Unlimited plans record no charge, so nothing is returned.
+    release_quota_charge(run["user_id"], run.get("quota_charge"))
 
 
 class WorkflowState(TypedDict, total=False):
@@ -114,6 +113,7 @@ def enqueue_generation_job(
     adaptive_source=None,
     source_grounding=None,
     idempotency_key=None,
+    quota_charge=None,
 ):
     try:
         user_doc = mongo.db.users.find_one({"_id": ObjectId(user_id)})
@@ -136,7 +136,15 @@ def enqueue_generation_job(
         idempotency_key=idempotency_key or os.urandom(16).hex(),
     )
     if created:
+        # Record the charge before work starts, so a failure can refund it.
+        mongo.db.generation_runs.update_one(
+            {"_id": run["_id"]},
+            {"$set": {"quota_charge": quota_charge, "quota_refunded": False}},
+        )
         _dispatch_generation_run(app, run["_id"])
+    else:
+        # The request matched an existing run; this request's charge is not used.
+        release_quota_charge(user_id, quota_charge)
     result = serialize_generation_run(run)
     result["deduplicated"] = not created
     return result
@@ -156,16 +164,16 @@ def cancel_generation_job(job_id, user_id):
     return serialize_generation_run(run) if run else None
 
 
-def retry_generation_job(app, job_id, user_id):
+def retry_generation_job(app, job_id, user_id, quota_charge=None):
     run = prepare_generation_retry(job_id, user_id)
     if not run:
         return None
-    # A retry re-consumes the quota slot that was refunded on failure,
-    # so the next terminal failure can be refunded again.
-    if run.get("quota_refunded"):
-        mongo.db.generation_runs.update_one(
-            {"_id": job_id}, {"$set": {"quota_refunded": False}}
-        )
+    # The retry carries a fresh charge (the failed attempt was refunded), so a
+    # later terminal failure refunds this new charge.
+    mongo.db.generation_runs.update_one(
+        {"_id": job_id},
+        {"$set": {"quota_charge": quota_charge, "quota_refunded": False}},
+    )
     _dispatch_generation_run(app, job_id)
     return serialize_generation_run(run)
 

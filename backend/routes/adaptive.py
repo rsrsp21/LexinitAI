@@ -88,6 +88,12 @@ def register_routes(app):
     def learner_dashboard():
         return jsonify(build_learner_dashboard(mongo.db, _authenticated_user_id()))
 
+    @app.route("/api/v1/learners/me/knowledge-map")
+    def learner_knowledge_map():
+        from backend.lexinit.services.learner_model import knowledge_map
+
+        return jsonify(knowledge_map(mongo.db, ObjectId(_authenticated_user_id())))
+
     @app.route("/api/v1/learners/me/mastery")
     def learner_mastery():
         user_id = _authenticated_user_id()
@@ -223,13 +229,14 @@ def register_routes(app):
             target_objective_ids=target_objective_ids,
         )
 
-        from backend.routes.content import ensure_generation_quota, generation_started_response
+        from backend.routes.content import generation_started_response
         from backend.services.generation_jobs import enqueue_generation_job
+        from backend.services.generation_quota import consume_generation_quota
 
         user_doc = mongo.db.users.find_one({"_id": user_object_id})
         if not user_doc:
             raise ApiError("User not found.", status_code=404, code="user_not_found")
-        quota_response = ensure_generation_quota(
+        quota_response, quota_charge = consume_generation_quota(
             user_id, user_doc, mode=source_session.get("generation_mode") or "Basic"
         )
         if quota_response:
@@ -259,6 +266,7 @@ def register_routes(app):
                 "target_objective_ids": target_objective_ids,
             },
             idempotency_key=_idempotency_key(),
+            quota_charge=quota_charge,
         )
         return generation_started_response(job)
 
