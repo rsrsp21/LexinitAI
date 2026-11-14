@@ -65,12 +65,14 @@ def _final_service():
     from backend.lexinit.services import AdaptiveLearningService
     from backend.lexinit.services.final_assessment import FinalAssessmentService
     from backend.clients import get_gemini_model
+    from backend.routes.coach import _coach_model
 
     return FinalAssessmentService(
         db=mongo.db,
         # The final decides the badge, so it uses the main model rather than
         # the faster coach model.
         generator=get_gemini_model(),
+        verifier=_coach_model(),
         adaptive_service=AdaptiveLearningService(
             MongoAdaptiveLearningRepository(
                 evidence_collection=mongo.db.mastery_evidence,

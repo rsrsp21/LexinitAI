@@ -41,6 +41,16 @@ class PracticeRequest(BaseModel):
     concept_id: str = Field(min_length=3, max_length=160)
 
 
+class QuestionReportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["assessment", "final", "check"]
+    reference_id: str = Field(min_length=8, max_length=80)
+    question_index: int = Field(default=0, ge=0, le=60)
+    reason: Literal["wrong_answer", "unclear", "off_topic", "other"]
+    note: str = Field(default="", max_length=500)
+
+
 class CheckAnswerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -165,6 +175,24 @@ def register_routes(app):
     @app.route("/api/v1/coach/daily-mix", methods=["POST"])
     def coach_daily_mix():
         return jsonify(coach_service().daily_mix(user_id=_user_id()))
+
+    @app.route("/api/v1/question-reports", methods=["POST"])
+    def create_question_report():
+        from backend.lexinit.services.question_quality import report_question
+
+        user_id = _user_id()
+        payload = parse_json_model(QuestionReportRequest, request.get_json(silent=True))
+        return jsonify(
+            report_question(
+                mongo.db,
+                user_id=ObjectId(user_id),
+                source=payload.source,
+                reference_id=payload.reference_id,
+                question_index=payload.question_index,
+                reason=payload.reason,
+                note=payload.note,
+            )
+        ), 201
 
     @app.route("/api/v1/coach/checks/<check_id>/answer", methods=["POST"])
     def coach_answer_check(check_id):

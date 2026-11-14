@@ -14,6 +14,7 @@ import {
 import { useState } from "react";
 
 import { ConceptCoachPanel, FixItCard } from "@/components/concept-coach";
+import { ReportQuestion } from "@/components/report-question";
 
 import {
   apiErrorMessage,
@@ -175,6 +176,10 @@ export function AssessmentResult({
                 assessmentType={data.assessment_type}
                 submissionId={data.submission_id}
                 sessionId={sessionId}
+                report={{
+                  source: "assessment",
+                  referenceId: data.submission_id,
+                }}
               />
             ))}
           </div>
@@ -190,6 +195,7 @@ export function QuestionResult({
   assessmentType,
   submissionId,
   sessionId,
+  report,
 }: {
   question: AssessmentSubmissionQuestion;
   index: number;
@@ -197,6 +203,8 @@ export function QuestionResult({
   /** When set, wrong answers offer a fix-it card. */
   submissionId?: string;
   sessionId: string;
+  /** Where a report about this question should be filed. */
+  report?: { source: "assessment" | "final"; referenceId: string };
 }) {
   return (
     <article className="rounded-2xl border border-border bg-background/45 p-4 sm:p-5">
@@ -229,6 +237,13 @@ export function QuestionResult({
               submissionId={submissionId}
               questionIndex={question.index ?? index}
               sessionId={sessionId}
+            />
+          )}
+          {report && (
+            <ReportQuestion
+              source={report.source}
+              referenceId={report.referenceId}
+              questionIndex={question.index ?? index}
             />
           )}
         </div>

@@ -30,6 +30,7 @@ from backend.lexinit.schemas.generation import Difficulty
 from backend.lexinit.services.adaptive import AdaptiveLearningService
 from backend.lexinit.services.curriculum import StructuredGenerator
 from backend.lexinit.services.learner_context import learner_context_instruction
+from backend.lexinit.services.question_quality import verify_answer_keys
 
 
 FINAL_PROMPT_VERSION = "final-v1"
@@ -121,9 +122,13 @@ class FinalAssessmentService:
         generator: StructuredGenerator,
         adaptive_service: AdaptiveLearningService,
         course_progress,
+        verifier: StructuredGenerator | None = None,
     ) -> None:
         self._db = db
         self._generator = generator
+        # Checking answer keys is a simpler task than writing the questions,
+        # so it can run on a faster model.
+        self._verifier = verifier or generator
         self._adaptive = adaptive_service
         self._course_progress = course_progress
 
@@ -177,6 +182,9 @@ class FinalAssessmentService:
             )
 
         questions = self._generate_questions(user_id, session_data)
+        verified = verify_answer_keys(self._verifier, questions)
+        if len(verified) >= FINAL_MIN_QUESTIONS:
+            questions = verified
         now = utcnow()
         final_id = f"final_{hashlib.sha256(f'{user_id}|{session_data['_id']}|{now.isoformat()}'.encode()).hexdigest()[:28]}"
         random.Random(final_id).shuffle(questions)
@@ -334,40 +342,36 @@ class FinalAssessmentService:
             )
             questions.append(question)
 
+        # Never show a question whose answer the learner has already seen.
+        known = {_stem_key(stem) for stem in seen}
+        fresh = [item for item in questions if _stem_key(item["question"]) not in known]
+        counts = {module_id: 0 for module_id in module_ids}
+        for item in fresh:
+            for module_id in {concept_module[value] for value in item["concept_ids"] if value in concept_module}:
+                counts[module_id] += 1
+        untested = [
+            str(module.get("title")) for module in modules if counts.get(module.get("module_id"), 0) == 0
+        ]
+        if len(fresh) >= FINAL_MIN_QUESTIONS and not untested:
+            return fresh
         if not correction:
-            # One corrective retry when coverage or freshness rules were missed.
-            known = {_stem_key(stem) for stem in seen}
-            repeated = [item["question"] for item in questions if _stem_key(item["question"]) in known]
-            counts = {module_id: 0 for module_id in module_ids}
-            for item in questions:
-                for module_id in {concept_module[value] for value in item["concept_ids"] if value in concept_module}:
-                    counts[module_id] += 1
-            thin = [
-                str(module.get("title"))
-                for module in modules
-                if counts.get(module.get("module_id"), 0) < 2
-            ]
+            # Regenerating costs a full model call, so it is reserved for a
+            # set that is too short or leaves a module untested.
             problems = []
-            if repeated:
-                problems.append("These repeat questions the learner has seen; replace them: " + " | ".join(repeated))
-            if thin:
-                problems.append("These modules need at least two questions each: " + "; ".join(thin))
-            if problems:
-                try:
-                    return self._generate_questions(
-                        user_id,
-                        session_data,
-                        correction="\n\nREQUIRED CORRECTION: " + " ".join(problems),
-                    )
-                except ApiError:
-                    pass
-        else:
-            # Second pass: drop anything still repeated rather than show a
-            # question whose answer the learner has already seen.
-            known = {_stem_key(stem) for stem in seen}
-            fresh = [item for item in questions if _stem_key(item["question"]) not in known]
-            if len(fresh) >= FINAL_MIN_QUESTIONS:
-                questions = fresh
+            if len(fresh) < FINAL_MIN_QUESTIONS:
+                problems.append("Too many questions repeated ones the learner has seen; write new ones.")
+            if untested:
+                problems.append("These modules need at least two questions each: " + "; ".join(untested))
+            try:
+                return self._generate_questions(
+                    user_id,
+                    session_data,
+                    correction="\n\nREQUIRED CORRECTION: " + " ".join(problems),
+                )
+            except ApiError:
+                pass
+        if len(fresh) >= FINAL_MIN_QUESTIONS:
+            questions = fresh
         return questions
 
     def _current_mastery(self, user_id: ObjectId, concept_ids: list[str]) -> dict[str, float]:

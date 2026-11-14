@@ -18,8 +18,8 @@ from backend.lexinit.schemas.generation import Difficulty
 logger = logging.getLogger(__name__)
 
 DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2}
-# Questions in a reattempt made of fresh questions.
-FRESH_ATTEMPT_SIZE = 3
+# Questions in one module assessment, per question type.
+MODULE_ATTEMPT_SIZE = 4
 ACTIVE_ATTEMPT_STATUSES = {"active", "ready", "submitting"}
 
 
@@ -80,6 +80,7 @@ class AdaptiveAssessmentAttemptService:
             session_data=session_data,
             assessment_type=assessment_type,
         )
+        bank_questions = [question for question in bank_questions if not question.get("reported")]
         if module_id:
             valid_module_ids = {
                 str(module.get("module_id"))
@@ -96,6 +97,9 @@ class AdaptiveAssessmentAttemptService:
         # fresh ones; if that is not possible, fall back to reusing questions.
         preferred_ids: list[str] = []
         if module_id:
+            # Module assessments have a fixed size, topped up with fresh
+            # questions, so one lucky answer cannot pass a module.
+            question_count = MODULE_ATTEMPT_SIZE
             seen_ids = self._seen_question_ids(
                 user_id=user_id,
                 session_id=session_data.get("_id", requested_session_id),
@@ -104,8 +108,8 @@ class AdaptiveAssessmentAttemptService:
                 module_bank=bank_questions,
             )
             unseen = [question for question in bank_questions if question["_id"] not in seen_ids]
-            wanted = min(question_count, FRESH_ATTEMPT_SIZE)
-            if seen_ids and len(unseen) < wanted and self._question_refresher is not None:
+            wanted = question_count
+            if len(unseen) < wanted and self._question_refresher is not None:
                 try:
                     session_data = self._question_refresher(
                         user_id=user_id,
@@ -240,6 +244,7 @@ class AdaptiveAssessmentAttemptService:
         next_count = int(attempt.get("answered_count", 0)) + 1
         if next_count < int(attempt["target_count"]):
             candidate_query = {
+                "reported": {"$ne": True},
                 "user_id": user_id,
                 "session_id": attempt["session_id"],
                 "assessment_type": attempt["assessment_type"],
@@ -458,7 +463,7 @@ class AdaptiveAssessmentAttemptService:
                 "difficulty": _difficulty_value(question.get("difficulty")),
                 "created_at": utcnow(),
             }
-            self._question_bank.replace_one({"_id": question_id}, document, upsert=True)
+            self._question_bank.update_one({"_id": question_id}, {"$set": document}, upsert=True)
         return list(
             self._question_bank.find(
                 {

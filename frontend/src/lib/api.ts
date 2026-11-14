@@ -1521,6 +1521,22 @@ export function startDailyMix() {
   });
 }
 
+export type QuestionReportReason =
+  "wrong_answer" | "unclear" | "off_topic" | "other";
+
+export function reportQuestion(report: {
+  source: "assessment" | "final" | "check";
+  reference_id: string;
+  question_index: number;
+  reason: QuestionReportReason;
+  note?: string;
+}) {
+  return requestJson<{ report_id: string; status: string }>(
+    "/api/v1/question-reports",
+    { method: "POST", json: { note: "", ...report } },
+  );
+}
+
 export function getFixIt(submissionId: string, questionIndex: number) {
   return requestJson<FixIt>("/api/v1/coach/fix-it", {
     method: "POST",

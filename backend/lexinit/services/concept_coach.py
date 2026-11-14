@@ -37,6 +37,7 @@ from backend.lexinit.schemas.generated_content import MCQDraft, OneWordDraft, Tr
 from backend.lexinit.schemas.generation import Difficulty
 from backend.lexinit.services.curriculum import StructuredGenerator
 from backend.lexinit.services.learner_context import learner_context_instruction
+from backend.lexinit.services.question_quality import verify_answer_keys
 
 
 COACH_PROMPT_VERSION = "coach-v1"
@@ -49,12 +50,12 @@ EXPLANATION_STYLES = {
 FIX_IT_EVIDENCE_WEIGHT = 0.6
 PRACTICE_EVIDENCE_WEIGHT = 0.8
 PRACTICE_SET_SIZE = 3
-MAX_MODULE_BANK_PER_TYPE = 12
+MAX_MODULE_BANK_PER_TYPE = 18
 DAILY_MIX_SIZE = 5
 PRE_CHECK_SIZE = 4
 PRE_CHECK_EVIDENCE_WEIGHT = 0.8
 DAILY_MIX_EVIDENCE_WEIGHT = 0.9
-MAX_REFILL = 3
+MAX_REFILL = 4
 
 
 class FixItDraft(BaseModel):
@@ -822,6 +823,7 @@ class ConceptCoachService:
                 )
             new_questions.append(question)
 
+        new_questions = verify_answer_keys(self._generator, new_questions)
         if not new_questions:
             return session_data
         updated = self._db.sessions.find_one_and_update(

@@ -37,6 +37,11 @@ def _serialize(value):
     return value
 
 
+# Never sent before submission. The misconception map names the wrong options,
+# so it would reveal the correct one by elimination.
+PRIVATE_QUESTION_KEYS = {"answer", "correct_answer", "explanation", "misconception_map", "accepted_answers"}
+
+
 def _public_session(session_data):
     """Return session content without pre-submission assessment solutions."""
     public = dict(session_data)
@@ -45,7 +50,7 @@ def _public_session(session_data):
         if not isinstance(questions, list):
             continue
         public[field] = [
-            {key: value for key, value in question.items() if key not in {"answer", "correct_answer", "explanation"}}
+            {key: value for key, value in question.items() if key not in PRIVATE_QUESTION_KEYS}
             if isinstance(question, dict)
             else question
             for question in questions

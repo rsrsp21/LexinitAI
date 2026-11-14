@@ -449,6 +449,7 @@ function FinalResult({
             index={index}
             assessmentType={question.type}
             sessionId={sessionId}
+            report={{ source: "final", referenceId: attempt.final_id }}
           />
         ))}
       </div>

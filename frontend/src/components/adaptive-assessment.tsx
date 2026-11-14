@@ -23,6 +23,9 @@ import { AssessmentResult } from "@/components/assessment-result";
 
 type Answer = number | boolean | string | null;
 
+/** Questions per type in a module assessment (set by the server). */
+const MODULE_ATTEMPT_SIZE = 4;
+
 export function AdaptiveAssessment({
   sessionId,
   assessmentType,
@@ -116,7 +119,7 @@ export function AdaptiveAssessment({
         sessionId,
         assessmentType,
         startKey,
-        Math.min(5, availableQuestions),
+        moduleId ? MODULE_ATTEMPT_SIZE : Math.min(5, availableQuestions),
         moduleId,
       );
       window.localStorage.setItem(storageKey, started.attempt_id);
@@ -239,9 +242,9 @@ export function AdaptiveAssessment({
               {forceNewToken ? "Reattempt assessment" : "Assessment"}
             </h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {Math.min(5, availableQuestions)} question
-              {Math.min(5, availableQuestions) === 1 ? "" : "s"}, one at a time.
-              Answers are shown after you finish. Score at least 50% to pass.
+              {moduleId ? MODULE_ATTEMPT_SIZE : Math.min(5, availableQuestions)}{" "}
+              questions, one at a time. Answers are shown after you finish.
+              Score at least 50% to pass.
             </p>
             <button
               type="button"
@@ -254,8 +257,8 @@ export function AdaptiveAssessment({
               ) : (
                 <LockKeyhole className="h-4 w-4" />
               )}
-              {loading && forceNewToken
-                ? "Preparing fresh questions"
+              {loading
+                ? "Preparing questions"
                 : forceNewToken
                   ? "Start reattempt"
                   : "Start assessment"}
