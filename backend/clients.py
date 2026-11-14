@@ -17,9 +17,39 @@ def _env(name):
     return os.environ.get(name)
 
 
+def _env_flag(name):
+    return (_env(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_genai_client():
+    """AI Studio (API key) by default; Vertex AI when GEMINI_USE_VERTEX is set.
+
+    Vertex bills through the Google Cloud billing account (and its credits)
+    and authenticates with the service account in GOOGLE_CREDENTIALS_BASE64,
+    falling back to Application Default Credentials.
+    """
+    if not _env_flag("GEMINI_USE_VERTEX"):
+        return genai.Client(api_key=_env("GEMINI_API_KEY"))
+
+    credentials = None
+    if _env("GOOGLE_CREDENTIALS_BASE64"):
+        credentials = get_google_credentials().with_scopes(
+            ["https://www.googleapis.com/auth/cloud-platform"]
+        )
+    project = _env("GOOGLE_CLOUD_PROJECT") or getattr(credentials, "project_id", None)
+    if not project:
+        raise RuntimeError("GOOGLE_CLOUD_PROJECT is required when GEMINI_USE_VERTEX is enabled.")
+    return genai.Client(
+        vertexai=True,
+        project=project,
+        location=_env("GOOGLE_CLOUD_LOCATION") or "global",
+        credentials=credentials,
+    )
+
+
 class GeminiModel:
-    def __init__(self, api_key, model_name, fallback_model_names=None):
-        self.client = genai.Client(api_key=api_key)
+    def __init__(self, model_name, fallback_model_names=None):
+        self.client = _build_genai_client()
         self.model_name = model_name
         self.fallback_model_names = fallback_model_names or []
 
@@ -159,7 +189,6 @@ def _fallback_tuple(fallback_model_names):
 @lru_cache(maxsize=16)
 def _get_gemini_model_cached(model_name, fallback_model_names):
     return GeminiModel(
-        api_key=_env("GEMINI_API_KEY"),
         model_name=model_name,
         fallback_model_names=list(fallback_model_names),
     )

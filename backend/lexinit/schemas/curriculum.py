@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from backend.lexinit.schemas.generation import Difficulty
 
@@ -31,7 +31,21 @@ class CurriculumModule(BaseModel):
     learning_objectives: list[LearningObjective] = Field(min_length=1, max_length=5)
     common_misconceptions: list[str] = Field(default_factory=list, max_length=5)
     difficulty: Difficulty
-    estimated_minutes: int = Field(ge=5, le=180)
+    estimated_minutes: int = Field(
+        ge=5,
+        le=180,
+        description="Estimated study time for this module in minutes, between 5 and 180.",
+    )
+
+    @field_validator("estimated_minutes", mode="before")
+    @classmethod
+    def clamp_estimated_minutes(cls, value):
+        # Numeric bounds are stripped from the schema sent to Gemini, so the
+        # model can overshoot. A time estimate is advisory: clamp it rather
+        # than failing the whole curriculum.
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return min(max(int(round(value)), 5), 180)
+        return value
 
 
 class Curriculum(BaseModel):

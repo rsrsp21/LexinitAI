@@ -27,7 +27,10 @@ def register_routes(app):
             return jsonify({"status": "not_ready", "database": "unavailable"}), 503
         required = {
             "secret_key": bool(current_app.config.get("SECRET_KEY")),
-            "gemini": bool(current_app.config.get("GEMINI_API_KEY")),
+            "gemini": bool(
+                current_app.config.get("GEMINI_API_KEY")
+                or (current_app.config.get("GEMINI_USE_VERTEX") and current_app.config.get("GOOGLE_CREDENTIALS_BASE64"))
+            ),
             "youtube": bool(current_app.config.get("YOUTUBE_API_KEY")),
         }
         status = "ready" if all(required.values()) else "degraded"
