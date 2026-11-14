@@ -273,7 +273,9 @@ def _is_coach_generation(path: str) -> bool:
         "/api/v1/coach/daily-mix",
     } or (
         path.startswith("/api/v1/sessions/") and path.endswith("/final-assessment")
-    ) or (path.startswith("/api/v1/coach/sessions/") and path.endswith("/pre-check"))
+    ) or (
+        path.startswith("/api/v1/coach/sessions/") and path.endswith(("/pre-check", "/booster"))
+    )
 
 
 def _starts_generation(path: str) -> bool:

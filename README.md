@@ -73,7 +73,7 @@ The LLM never grades, authorises, or decides what a learner should do next.
   - **Repeats count less.** A correct answer to a question seen within a day counts about a third.
   - **Old evidence fades** with a 45-day half-life, and **forgetting** is modelled between reviews: mastery shown to the learner is 90% of its peak when a review falls due.
 - **Adaptive policy** ([`lexinit/domain/mastery/policy.py`](./backend/lexinit/domain/mastery/policy.py)): a pure function that chooses one of seven actions. It asks for more evidence before labelling anyone, and only sends a learner back to prerequisites when mastery is actually low. Each decision is stored with **machine-readable reason codes** and the evidence IDs behind it.
-- **The response matches the size of the gap** ([`lexinit/services/concept_coach.py`](./backend/lexinit/services/concept_coach.py)): one wrong answer gets a fix-it card, a weak concept gets a new explanation and practice, and a full new course is the last resort. Coach questions keep their answers on the server until answered, and every answer becomes mastery evidence.
+- **The response matches the size of the gap** ([`lexinit/services/concept_coach.py`](./backend/lexinit/services/concept_coach.py)): one wrong answer gets a fix-it card, a weak concept gets a new explanation and practice, a concept still weak after practice gets a **booster** (a ten-minute lesson and five questions inside the course, with its own daily allowance), and a full new course is the last resort. Coach questions keep their answers on the server until answered, and every answer becomes mastery evidence.
 - **Spaced review.** The next review date follows the mastery band (1, 3, 7, or 14 days), and a daily mix draws the due and weakest concepts from every course.
 - **One learner model across courses** ([`lexinit/services/learner_model.py`](./backend/lexinit/services/learner_model.py)): a concept already learnt in one course gives the same-named concept a head start in the next.
 - **Measured, not assumed.** [`scripts/evaluate_mastery.py`](./backend/scripts/evaluate_mastery.py) scores how well mastery predicts each learner's *next* answer. On 300 simulated learners it reaches a Brier score of 0.229 and AUC of 0.67, against 0.250 and 0.50 for always guessing 50% and 0.270 and 0.57 for a running average.
@@ -274,7 +274,7 @@ npm run build
 
 ```bash
 cd backend
-uv run --group dev pytest                 # 71 tests; the database-backed ones need MongoDB and are skipped without it
+uv run --group dev pytest                 # 77 tests; the database-backed ones need MongoDB and are skipped without it
 ```
 
 ```bash
@@ -309,7 +309,7 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 
 These are stated openly so reviewers know where the edges are:
 
-- **Generation itself is not in the automated suite.** The 71 tests cover mastery, grading, limits, answer-key checks, module practice, and (against a throwaway MongoDB) assessment attempts, plan quotas, the final assessment and course deletion. Creating a course calls the model, so it is verified by scripted runs rather than in CI.
+- **Generation itself is not in the automated suite.** The 77 tests cover mastery, grading, limits, answer-key checks, module practice, and (against a throwaway MongoDB) assessment attempts, plan quotas, the final assessment, boosters and course deletion. Creating a course calls the model, so it is verified by scripted runs rather than in CI.
 - **The mastery weights are judgement, not fitted.** They beat simple baselines on simulated learners; there is not yet enough real evidence to tune them.
 - **Grounding in the study text is by instruction, not measured.** Questions are written with the module's study material in the prompt and told to test only what it explains; there is no automatic check that each answer appears in the text.
 - **No explicit prompt caching.** Each module call now sends only its own module's context, which removed most repeated input; the shared context is placed first in the prompt, but no cache is created explicitly.

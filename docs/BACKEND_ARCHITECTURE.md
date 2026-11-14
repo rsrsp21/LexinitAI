@@ -110,7 +110,7 @@ Every answer, from any activity, becomes a `MasteryEvidence` record and updates 
 | Source | Weight | Notes |
 | --- | --- | --- |
 | Module assessment, final assessment | 1.0 | Final uses only unseen questions |
-| Daily mix | 0.9 | Due and weak concepts from every course |
+| Daily mix, booster re-check | 0.9 | Due and weak concepts from every course |
 | Practice set, module pre-check | 0.8 | Fresh questions per concept |
 | Lecture knowledge check | 0.75 | Graded against the transcript |
 | Fix-it check | 0.6 | Asked right after the explanation |
@@ -122,6 +122,7 @@ Correct answers are further scaled by difficulty, by the chance of guessing the 
 Services built on that estimate:
 
 - `concept_coach.py`: responses sized to the gap (fix-it card, alternative explanation, practice set, pre-check, daily mix). Answers to coach questions stay on the server until submitted.
+- `booster.py`: when a concept is below 50% after at least three answers, one model call writes a short lesson that addresses the confusions the learner has shown, plus five re-check questions. It is stored inside the course, limited per day by plan (2, 5 or 10), and reports mastery before and after.
 - `final_assessment.py`: unlocks when every module is passed; twelve new questions weighted toward weak concepts; 70% to pass; a 24-hour wait after a failed attempt. Passing is required for course completion and the badge.
 - `learner_model.py`: knowledge map, mastery carry-over between courses, and course goal dates.
 - `course_deletion.py`: removes a course with its attempts, results, coach history, progress and mastery; mastery for a concept also practised elsewhere is recalculated instead of deleted.

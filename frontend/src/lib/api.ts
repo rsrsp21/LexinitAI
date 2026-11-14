@@ -1464,6 +1464,55 @@ export function submitFinalAssessment(
   );
 }
 
+export type Booster = {
+  booster_id: string;
+  session_id: string;
+  title: string;
+  lesson: string;
+  key_points: string[];
+  concepts: Array<{
+    concept_id: string;
+    concept_label: string;
+    mastery_before: number;
+    current_mastery: number | null;
+    band: string | null;
+  }>;
+  checks: Array<CoachCheck & { concept_label: string }>;
+  total: number;
+  answered: number;
+  correct: number;
+  completed: boolean;
+  percent: number;
+  gap_closed: boolean;
+  pass_percent: number;
+  created_at: string | null;
+};
+
+export type BoosterStatus = {
+  eligible: boolean;
+  concepts: Array<{
+    concept_id: string;
+    concept_label: string;
+    current_mastery: number;
+  }>;
+  booster: Booster | null;
+  daily_limit: number;
+  remaining_today: number;
+};
+
+export function getBoosterStatus(sessionId: string) {
+  return requestJson<BoosterStatus>(
+    `/api/v1/coach/sessions/${encodeURIComponent(sessionId)}/booster`,
+  );
+}
+
+export function createBooster(sessionId: string) {
+  return requestJson<Booster>(
+    `/api/v1/coach/sessions/${encodeURIComponent(sessionId)}/booster`,
+    { method: "POST", json: {} },
+  );
+}
+
 export type CourseMastery = {
   session_id: string;
   concepts: Record<

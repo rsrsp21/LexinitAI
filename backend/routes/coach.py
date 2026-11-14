@@ -88,6 +88,18 @@ def _coach_model():
     return get_gemini_model(coach_model, [main_model] if main_model else [])
 
 
+def booster_service():
+    from backend.lexinit.services.booster import BoosterService
+
+    # The lesson is written by the main model; answer keys are checked by the
+    # faster coach model.
+    return BoosterService(
+        coach=coach_service(),
+        generator=get_gemini_model(),
+        verifier=_coach_model(),
+    )
+
+
 def _safe_session_id(value: str) -> str:
     if not valid_safe_id(value):
         raise ApiError("Invalid course link.", code="invalid_session_id")
@@ -146,6 +158,18 @@ def register_routes(app):
                 session_id=_safe_session_id(payload.session_id),
                 concept_id=payload.concept_id,
             )
+        )
+
+    @app.route("/api/v1/coach/sessions/<session_id>/booster")
+    def coach_booster_status(session_id):
+        return jsonify(
+            booster_service().status(user_id=_user_id(), session_id=_safe_session_id(session_id))
+        )
+
+    @app.route("/api/v1/coach/sessions/<session_id>/booster", methods=["POST"])
+    def coach_booster_create(session_id):
+        return jsonify(
+            booster_service().create(user_id=_user_id(), session_id=_safe_session_id(session_id))
         )
 
     @app.route("/api/v1/coach/sessions/<session_id>/mastery")

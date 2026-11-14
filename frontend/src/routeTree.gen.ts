@@ -30,6 +30,7 @@ import { Route as AppSessionIdPathRouteImport } from './routes/app.session.$id.p
 import { Route as AppSessionIdMaterialsRouteImport } from './routes/app.session.$id.materials'
 import { Route as AppSessionIdFlashcardsRouteImport } from './routes/app.session.$id.flashcards'
 import { Route as AppSessionIdFinalRouteImport } from './routes/app.session.$id.final'
+import { Route as AppSessionIdBoosterRouteImport } from './routes/app.session.$id.booster'
 import { Route as AppSessionIdAssessmentsRouteImport } from './routes/app.session.$id.assessments'
 
 const WaitlistRoute = WaitlistRouteImport.update({
@@ -137,6 +138,11 @@ const AppSessionIdFinalRoute = AppSessionIdFinalRouteImport.update({
   path: '/session/$id/final',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSessionIdBoosterRoute = AppSessionIdBoosterRouteImport.update({
+  id: '/session/$id/booster',
+  path: '/session/$id/booster',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSessionIdAssessmentsRoute = AppSessionIdAssessmentsRouteImport.update({
   id: '/session/$id/assessments',
   path: '/session/$id/assessments',
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/app/reviews': typeof AppReviewsRoute
   '/app/': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/booster': typeof AppSessionIdBoosterRoute
   '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/app/reviews': typeof AppReviewsRoute
   '/app': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/booster': typeof AppSessionIdBoosterRoute
   '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/app/reviews': typeof AppReviewsRoute
   '/app/': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/booster': typeof AppSessionIdBoosterRoute
   '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/app/reviews'
     | '/app/'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/booster'
     | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/app/reviews'
     | '/app'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/booster'
     | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/app/reviews'
     | '/app/'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/booster'
     | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
@@ -448,6 +460,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSessionIdFinalRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/session/$id/booster': {
+      id: '/app/session/$id/booster'
+      path: '/session/$id/booster'
+      fullPath: '/app/session/$id/booster'
+      preLoaderRoute: typeof AppSessionIdBoosterRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/session/$id/assessments': {
       id: '/app/session/$id/assessments'
       path: '/session/$id/assessments'
@@ -467,6 +486,7 @@ interface AppRouteChildren {
   AppReviewsRoute: typeof AppReviewsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSessionIdAssessmentsRoute: typeof AppSessionIdAssessmentsRoute
+  AppSessionIdBoosterRoute: typeof AppSessionIdBoosterRoute
   AppSessionIdFinalRoute: typeof AppSessionIdFinalRoute
   AppSessionIdFlashcardsRoute: typeof AppSessionIdFlashcardsRoute
   AppSessionIdMaterialsRoute: typeof AppSessionIdMaterialsRoute
@@ -485,6 +505,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReviewsRoute: AppReviewsRoute,
   AppIndexRoute: AppIndexRoute,
   AppSessionIdAssessmentsRoute: AppSessionIdAssessmentsRoute,
+  AppSessionIdBoosterRoute: AppSessionIdBoosterRoute,
   AppSessionIdFinalRoute: AppSessionIdFinalRoute,
   AppSessionIdFlashcardsRoute: AppSessionIdFlashcardsRoute,
   AppSessionIdMaterialsRoute: AppSessionIdMaterialsRoute,

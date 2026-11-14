@@ -107,9 +107,18 @@ export function AssessmentResult({
                 {data.weak_topic}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Try the fixes and practice above first. If this topic still
-                feels shaky, build a separate focused course on it (uses one
-                daily generation).
+                Try the fixes and practice above first, then a{" "}
+                <Link
+                  to="/app/session/$id/booster"
+                  params={{ id: sessionId }}
+                  search={{ module: undefined }}
+                  className="font-semibold text-foreground underline underline-offset-2"
+                >
+                  booster
+                </Link>{" "}
+                if a concept stays weak. If the whole topic still feels shaky,
+                build a separate focused course on it (uses one daily
+                generation).
               </p>
             </div>
           </div>

@@ -5,6 +5,7 @@ import {
   BookOpen,
   BrainCircuit,
   CheckCircle2,
+  Zap,
   Check,
   ChevronDown,
   Circle,
@@ -24,6 +25,7 @@ import {
   apiErrorMessage,
   getCourse,
   setCourseActivity,
+  getBoosterStatus,
   unlockCourseModule,
   type CourseActivity,
   type CourseModule,
@@ -200,6 +202,7 @@ function CoursePage() {
           goal={course.goal}
           onChange={applyCourse}
         />
+        <BoosterCard sessionId={id} />
 
         {nextActivity && (
           <motion.div
@@ -324,6 +327,43 @@ function CoursePage() {
         <DeleteCourse sessionId={id} topic={course.topic} />
       </section>
     </div>
+  );
+}
+
+/** Shown only when a concept is still weak after practice, or a booster is
+ * already open. */
+function BoosterCard({ sessionId }: { sessionId: string }) {
+  const status = useQuery({
+    queryKey: ["booster", sessionId],
+    queryFn: () => getBoosterStatus(sessionId),
+    staleTime: 15_000,
+  });
+  const data = status.data;
+  const open = data?.booster && !data.booster.completed;
+  if (!data || (!data.eligible && !open)) return null;
+  const names = data.concepts.map((concept) => concept.concept_label);
+  return (
+    <Link
+      to="/app/session/$id/booster"
+      params={{ id: sessionId }}
+      search={{ module: undefined }}
+      className="relative mt-3 flex items-center gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 transition hover:border-amber-500/60"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+        <Zap className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">
+          {open ? "Finish your booster" : "A booster is ready for you"}
+        </span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">
+          {open
+            ? `${data.booster?.answered} of ${data.booster?.total} questions answered.`
+            : `Still weak after practice: ${names.join(", ")}. A ten-minute lesson and five questions.`}
+        </span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+    </Link>
   );
 }
 
