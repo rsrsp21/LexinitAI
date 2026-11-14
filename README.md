@@ -274,12 +274,14 @@ npm run build
 
 ```bash
 cd backend
-uv run --group dev pytest                 # mastery, grading, limits, answer-key checks
+uv run --group dev pytest                 # 71 tests; the database-backed ones need MongoDB and are skipped without it
 ```
 
 ```bash
 python -m backend.scripts.evaluate_mastery --simulate   # does mastery predict the next answer?
 ```
+
+Every push and pull request runs these checks in GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
 
 ---
 
@@ -307,7 +309,7 @@ All settings are environment variables. [`backend/.env.example`](./backend/.env.
 
 These are stated openly so reviewers know where the edges are:
 
-- **Tests cover the pure logic only.** Mastery, grading, rate limiting and answer-key checks have pytest coverage. The database-backed flows (attempts, quotas, final assessment, course deletion) were verified with scripted runs against a throwaway database but are not yet in the suite, and there is no CI.
+- **Generation itself is not in the automated suite.** The 71 tests cover mastery, grading, limits, answer-key checks, module practice, and (against a throwaway MongoDB) assessment attempts, plan quotas, the final assessment and course deletion. Creating a course calls the model, so it is verified by scripted runs rather than in CI.
 - **The mastery weights are judgement, not fitted.** They beat simple baselines on simulated learners; there is not yet enough real evidence to tune them.
 - **Grounding in the study text is by instruction, not measured.** Questions are written with the module's study material in the prompt and told to test only what it explains; there is no automatic check that each answer appears in the text.
 - **No explicit prompt caching.** Each module call now sends only its own module's context, which removed most repeated input; the shared context is placed first in the prompt, but no cache is created explicitly.
