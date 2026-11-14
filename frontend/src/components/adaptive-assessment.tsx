@@ -29,12 +29,15 @@ export function AdaptiveAssessment({
   availableQuestions,
   moduleId,
   forceNewToken,
+  latestSubmissionId,
 }: {
   sessionId: string;
   assessmentType: AssessmentType;
   availableQuestions: number;
   moduleId?: string;
   forceNewToken?: string;
+  /** Most recent graded submission for this module and type, if any. */
+  latestSubmissionId?: string | null;
 }) {
   const storageKey = `lexinit:assessment-attempt:${sessionId}:${assessmentType}:${moduleId || "all"}`;
   const startKeyStorage = `${storageKey}:start-key`;
@@ -54,29 +57,46 @@ export function AdaptiveAssessment({
     [attempt, question],
   );
 
+  // Only wait when there is a saved attempt to restore; otherwise switching
+  // assessment type would flash a loader before showing the same content.
+  const [restoring, setRestoring] = useState(() => {
+    try {
+      return Boolean(window.localStorage.getItem(storageKey));
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
-    if (forceNewToken) {
+    const clearStoredAttempt = () => {
       window.localStorage.removeItem(storageKey);
       window.localStorage.removeItem(startKeyStorage);
       window.localStorage.removeItem(finalizeKeyStorage);
-      setAttempt(null);
-      setResult(null);
+    };
+    const attemptId = window.localStorage.getItem(storageKey);
+    if (!attemptId) {
+      setRestoring(false);
       return;
     }
-    const attemptId = window.localStorage.getItem(storageKey);
-    if (!attemptId) return;
     setLoading(true);
     getAssessmentAttempt(attemptId)
       .then((restored) => {
+        if (restored.status === "completed" || restored.status === "expired") {
+          // A finished attempt is never resumed; its result comes from the
+          // latest submission, and a reattempt starts a fresh attempt.
+          clearStoredAttempt();
+          if (!forceNewToken && restored.public_result) {
+            setResult(restored.public_result);
+          }
+          return;
+        }
         setAttempt(restored);
-        setResult(restored.public_result || null);
       })
-      .catch(() => {
-        window.localStorage.removeItem(storageKey);
-        window.localStorage.removeItem(startKeyStorage);
-        window.localStorage.removeItem(finalizeKeyStorage);
-      })
-      .finally(() => setLoading(false));
+      .catch(clearStoredAttempt)
+      .finally(() => {
+        setLoading(false);
+        setRestoring(false);
+      });
   }, [finalizeKeyStorage, forceNewToken, startKeyStorage, storageKey]);
 
   useEffect(() => {
@@ -101,6 +121,8 @@ export function AdaptiveAssessment({
       );
       window.localStorage.setItem(storageKey, started.attempt_id);
       setAttempt(started);
+      // A reattempt can add fresh questions to the course.
+      void queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
     } catch (cause) {
       setError(apiErrorMessage(cause, "Could not start the assessment."));
     } finally {
@@ -165,6 +187,11 @@ export function AdaptiveAssessment({
         queryClient.invalidateQueries({ queryKey: ["weak-concepts"] }),
         queryClient.invalidateQueries({ queryKey: ["next-recommendation"] }),
         queryClient.invalidateQueries({ queryKey: ["due-reviews"] }),
+        queryClient.invalidateQueries({ queryKey: ["course", sessionId] }),
+        queryClient.invalidateQueries({ queryKey: ["courses"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["course-assessments", sessionId],
+        }),
       ]);
     } catch (cause) {
       setError(apiErrorMessage(cause, "Could not submit this assessment."));
@@ -179,10 +206,21 @@ export function AdaptiveAssessment({
     );
   }
 
-  if (result) {
+  if (restoring) {
+    return (
+      <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading assessment
+      </div>
+    );
+  }
+
+  const shownSubmissionId =
+    result?.submission_id ||
+    (!attempt && !forceNewToken ? latestSubmissionId : null);
+  if (shownSubmissionId) {
     return (
       <AssessmentResult
-        submissionId={result.submission_id}
+        submissionId={shownSubmissionId}
         sessionId={sessionId}
         moduleId={moduleId}
       />
@@ -197,10 +235,13 @@ export function AdaptiveAssessment({
             <BrainCircuit className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-display text-2xl tracking-tight">Assessment</h3>
+            <h3 className="font-display text-2xl tracking-tight">
+              {forceNewToken ? "Reattempt assessment" : "Assessment"}
+            </h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Questions appear one at a time and adjust to how you are doing.
-              Answers are shown after you finish.
+              {Math.min(5, availableQuestions)} question
+              {Math.min(5, availableQuestions) === 1 ? "" : "s"}, one at a time.
+              Answers are shown after you finish. Score at least 50% to pass.
             </p>
             <button
               type="button"
@@ -213,7 +254,11 @@ export function AdaptiveAssessment({
               ) : (
                 <LockKeyhole className="h-4 w-4" />
               )}
-              Start assessment
+              {loading && forceNewToken
+                ? "Preparing fresh questions"
+                : forceNewToken
+                  ? "Start reattempt"
+                  : "Start assessment"}
             </button>
           </div>
         </div>
@@ -300,7 +345,7 @@ export function AdaptiveAssessment({
   );
 }
 
-function AnswerControl({
+export function AnswerControl({
   assessmentType,
   options,
   value,

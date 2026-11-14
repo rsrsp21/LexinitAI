@@ -21,6 +21,7 @@ import { Route as AppReviewsRouteImport } from './routes/app.reviews'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppPricingRouteImport } from './routes/app.pricing'
 import { Route as AppNewCourseRouteImport } from './routes/app.new-course'
+import { Route as AppKnowledgeRouteImport } from './routes/app.knowledge'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppSessionIdIndexRouteImport } from './routes/app.session.$id.index'
 import { Route as AppSessionIdVideosRouteImport } from './routes/app.session.$id.videos'
@@ -28,6 +29,7 @@ import { Route as AppSessionIdResourcesRouteImport } from './routes/app.session.
 import { Route as AppSessionIdPathRouteImport } from './routes/app.session.$id.path'
 import { Route as AppSessionIdMaterialsRouteImport } from './routes/app.session.$id.materials'
 import { Route as AppSessionIdFlashcardsRouteImport } from './routes/app.session.$id.flashcards'
+import { Route as AppSessionIdFinalRouteImport } from './routes/app.session.$id.final'
 import { Route as AppSessionIdAssessmentsRouteImport } from './routes/app.session.$id.assessments'
 
 const WaitlistRoute = WaitlistRouteImport.update({
@@ -90,6 +92,11 @@ const AppNewCourseRoute = AppNewCourseRouteImport.update({
   path: '/new-course',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKnowledgeRoute = AppKnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInsightsRoute = AppInsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
@@ -125,6 +132,11 @@ const AppSessionIdFlashcardsRoute = AppSessionIdFlashcardsRouteImport.update({
   path: '/session/$id/flashcards',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSessionIdFinalRoute = AppSessionIdFinalRouteImport.update({
+  id: '/session/$id/final',
+  path: '/session/$id/final',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSessionIdAssessmentsRoute = AppSessionIdAssessmentsRouteImport.update({
   id: '/session/$id/assessments',
   path: '/session/$id/assessments',
@@ -140,12 +152,14 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/knowledge': typeof AppKnowledgeRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reviews': typeof AppReviewsRoute
   '/app/': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
   '/app/session/$id/path': typeof AppSessionIdPathRoute
@@ -161,12 +175,14 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/knowledge': typeof AppKnowledgeRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reviews': typeof AppReviewsRoute
   '/app': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
   '/app/session/$id/path': typeof AppSessionIdPathRoute
@@ -184,12 +200,14 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/knowledge': typeof AppKnowledgeRoute
   '/app/new-course': typeof AppNewCourseRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reviews': typeof AppReviewsRoute
   '/app/': typeof AppIndexRoute
   '/app/session/$id/assessments': typeof AppSessionIdAssessmentsRoute
+  '/app/session/$id/final': typeof AppSessionIdFinalRoute
   '/app/session/$id/flashcards': typeof AppSessionIdFlashcardsRoute
   '/app/session/$id/materials': typeof AppSessionIdMaterialsRoute
   '/app/session/$id/path': typeof AppSessionIdPathRoute
@@ -208,12 +226,14 @@ export interface FileRouteTypes {
     | '/terms'
     | '/waitlist'
     | '/app/insights'
+    | '/app/knowledge'
     | '/app/new-course'
     | '/app/pricing'
     | '/app/profile'
     | '/app/reviews'
     | '/app/'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
     | '/app/session/$id/path'
@@ -229,12 +249,14 @@ export interface FileRouteTypes {
     | '/terms'
     | '/waitlist'
     | '/app/insights'
+    | '/app/knowledge'
     | '/app/new-course'
     | '/app/pricing'
     | '/app/profile'
     | '/app/reviews'
     | '/app'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
     | '/app/session/$id/path'
@@ -251,12 +273,14 @@ export interface FileRouteTypes {
     | '/terms'
     | '/waitlist'
     | '/app/insights'
+    | '/app/knowledge'
     | '/app/new-course'
     | '/app/pricing'
     | '/app/profile'
     | '/app/reviews'
     | '/app/'
     | '/app/session/$id/assessments'
+    | '/app/session/$id/final'
     | '/app/session/$id/flashcards'
     | '/app/session/$id/materials'
     | '/app/session/$id/path'
@@ -361,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNewCourseRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/knowledge': {
+      id: '/app/knowledge'
+      path: '/knowledge'
+      fullPath: '/app/knowledge'
+      preLoaderRoute: typeof AppKnowledgeRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/insights': {
       id: '/app/insights'
       path: '/insights'
@@ -410,6 +441,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSessionIdFlashcardsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/session/$id/final': {
+      id: '/app/session/$id/final'
+      path: '/session/$id/final'
+      fullPath: '/app/session/$id/final'
+      preLoaderRoute: typeof AppSessionIdFinalRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/session/$id/assessments': {
       id: '/app/session/$id/assessments'
       path: '/session/$id/assessments'
@@ -422,12 +460,14 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppInsightsRoute: typeof AppInsightsRoute
+  AppKnowledgeRoute: typeof AppKnowledgeRoute
   AppNewCourseRoute: typeof AppNewCourseRoute
   AppPricingRoute: typeof AppPricingRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReviewsRoute: typeof AppReviewsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSessionIdAssessmentsRoute: typeof AppSessionIdAssessmentsRoute
+  AppSessionIdFinalRoute: typeof AppSessionIdFinalRoute
   AppSessionIdFlashcardsRoute: typeof AppSessionIdFlashcardsRoute
   AppSessionIdMaterialsRoute: typeof AppSessionIdMaterialsRoute
   AppSessionIdPathRoute: typeof AppSessionIdPathRoute
@@ -438,12 +478,14 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppInsightsRoute: AppInsightsRoute,
+  AppKnowledgeRoute: AppKnowledgeRoute,
   AppNewCourseRoute: AppNewCourseRoute,
   AppPricingRoute: AppPricingRoute,
   AppProfileRoute: AppProfileRoute,
   AppReviewsRoute: AppReviewsRoute,
   AppIndexRoute: AppIndexRoute,
   AppSessionIdAssessmentsRoute: AppSessionIdAssessmentsRoute,
+  AppSessionIdFinalRoute: AppSessionIdFinalRoute,
   AppSessionIdFlashcardsRoute: AppSessionIdFlashcardsRoute,
   AppSessionIdMaterialsRoute: AppSessionIdMaterialsRoute,
   AppSessionIdPathRoute: AppSessionIdPathRoute,

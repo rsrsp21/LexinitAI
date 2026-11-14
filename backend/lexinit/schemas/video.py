@@ -17,11 +17,17 @@ class VideoProgressRequest(BaseModel):
     position_seconds: float = Field(ge=0, le=86_400)
     duration_seconds: float = Field(gt=0, le=86_400)
     state: VideoPlaybackState
+    # Stretches of the video actually played since the last report, as
+    # [start_seconds, end_seconds] pairs. Seeks are not included.
+    watched_segments: list[tuple[float, float]] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
     def position_must_fit_duration(self):
         if self.position_seconds > self.duration_seconds + 5:
             raise ValueError("Playback position cannot exceed video duration.")
+        for start, end in self.watched_segments:
+            if start < 0 or end <= start or end > self.duration_seconds + 5:
+                raise ValueError("Watched segments must lie within the video.")
         return self
 
 

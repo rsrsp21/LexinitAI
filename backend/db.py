@@ -130,6 +130,23 @@ def ensure_database_schema(app):
             expireAfterSeconds=86400,
         )
         create_index_ignoring_equivalent_conflict(
+            db.course_goals,
+            [("user_id", 1), ("session_id", 1)],
+            unique=True,
+        )
+        create_index_ignoring_equivalent_conflict(
+            db.final_assessments,
+            [("user_id", 1), ("session_id", 1), ("created_at", 1)],
+        )
+        create_index_ignoring_equivalent_conflict(
+            db.coach_checks,
+            [("user_id", 1), ("session_id", 1), ("concept_ids", 1), ("created_at", -1)],
+        )
+        create_index_ignoring_equivalent_conflict(
+            db.coach_items,
+            [("user_id", 1), ("session_id", 1), ("kind", 1)],
+        )
+        create_index_ignoring_equivalent_conflict(
             db.assessment_question_bank,
             [("user_id", 1), ("session_id", 1), ("assessment_type", 1)],
         )

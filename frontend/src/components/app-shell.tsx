@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
 import {
   BarChart3,
+  Network,
   Award,
   BookOpen,
   BrainCircuit,
@@ -285,20 +286,17 @@ function MobileCourseNavigation() {
                               key={activity.activity_id}
                               to={item.to}
                               params={{ id: sessionId }}
-                              search={{
-                                module: module.module_id,
-                                ...(activity.type === "assessment" &&
-                                activity.latest_submission_id
-                                  ? {
-                                      submission: activity.latest_submission_id,
-                                    }
-                                  : {}),
-                              }}
+                              search={{ module: module.module_id }}
                               onClick={() => setOpen(false)}
                               className={`flex min-h-10 items-center gap-2 rounded-xl px-2.5 text-xs font-medium transition ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                             >
                               <Icon className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{item.label}</span>
+                              <span className="truncate">
+                                {activityLabel(
+                                  activity.type,
+                                  activity.item_count,
+                                )}
+                              </span>
                               {activity.status === "completed" && (
                                 <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0" />
                               )}
@@ -311,6 +309,30 @@ function MobileCourseNavigation() {
                 );
               })}
             </div>
+            {course.data?.final_assessment?.required && (
+              <Link
+                to="/app/session/$id/final"
+                params={{ id: sessionId }}
+                search={{ module: undefined }}
+                onClick={() => setOpen(false)}
+                aria-current={pathname.endsWith("/final") ? "page" : undefined}
+                className={`mt-3 flex min-h-14 items-center gap-3 rounded-2xl border px-3.5 py-2.5 transition ${pathname.endsWith("/final") ? "border-accent/45 bg-accent/10 text-accent" : "border-border bg-background/45 text-foreground hover:bg-muted"}`}
+              >
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${pathname.endsWith("/final") ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}
+                >
+                  <BrainCircuit className="h-4.5 w-4.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">
+                    Final assessment
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {finalAssessmentLabel(course.data.final_assessment.state)}
+                  </span>
+                </span>
+              </Link>
+            )}
             <Link
               to="/app/session/$id/resources"
               params={{ id: sessionId }}
@@ -544,6 +566,12 @@ function SessionsSidebar({
           />
           <RailLink
             collapsed={collapsed}
+            icon={Network}
+            label="Knowledge map"
+            to="/app/knowledge"
+          />
+          <RailLink
+            collapsed={collapsed}
             icon={Award}
             label="Badges"
             to="/app/profile"
@@ -643,6 +671,23 @@ const COURSE_ACTIVITY_LINKS = {
     to: "/app/session/$id/assessments",
   },
 } as const;
+
+function finalAssessmentLabel(state: string) {
+  if (state === "passed") return "Passed";
+  if (state === "locked") return "Pass every module to unlock";
+  if (state === "in_progress") return "In progress";
+  if (state === "cooldown") return "Review, then retake";
+  return "Ready to take";
+}
+
+function activityLabel(
+  type: keyof typeof COURSE_ACTIVITY_LINKS,
+  count: number,
+) {
+  if (count === 1 && type === "video") return "Video Lecture";
+  if (count === 1 && type === "material") return "Study Material";
+  return COURSE_ACTIVITY_LINKS[type].label;
+}
 
 function CourseSidebar({
   sessionId,
@@ -798,13 +843,7 @@ function CourseSidebar({
                             key={activity.activity_id}
                             to={item.to}
                             params={{ id: sessionId }}
-                            search={{
-                              module: module.module_id,
-                              ...(activity.type === "assessment" &&
-                              activity.latest_submission_id
-                                ? { submission: activity.latest_submission_id }
-                                : {}),
-                            }}
+                            search={{ module: module.module_id }}
                             aria-current={
                               module.module_id === selectedModuleId &&
                               pathname.endsWith(`/${activity.route}`)
@@ -819,7 +858,10 @@ function CourseSidebar({
                               <Icon className="h-4 w-4 shrink-0" />
                             )}
                             <span className="min-w-0 flex-1 truncate">
-                              {item.label}
+                              {activityLabel(
+                                activity.type,
+                                activity.item_count,
+                              )}
                             </span>
                             {activity.item_count > 0 && (
                               <span className="text-xs">
@@ -834,6 +876,32 @@ function CourseSidebar({
               </div>
             ))}
           </div>
+          {course?.final_assessment?.required && (
+            <Link
+              to="/app/session/$id/final"
+              params={{ id: sessionId }}
+              search={{ module: undefined }}
+              aria-label="Final assessment"
+              aria-current={pathname.endsWith("/final") ? "page" : undefined}
+              className={`flex min-h-14 items-center border-b border-border transition hover:bg-muted ${collapsed ? "justify-center px-2" : "gap-3 px-4 py-3"} ${pathname.endsWith("/final") ? "border-l-2 border-l-accent bg-accent/10 text-accent" : "text-foreground"}`}
+            >
+              <span
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${pathname.endsWith("/final") ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"}`}
+              >
+                <BrainCircuit className="h-4 w-4" />
+              </span>
+              {!collapsed && (
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">
+                    Final assessment
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {finalAssessmentLabel(course.final_assessment.state)}
+                  </span>
+                </span>
+              )}
+            </Link>
+          )}
           <Link
             to="/app/session/$id/resources"
             params={{ id: sessionId }}
@@ -938,7 +1006,7 @@ function RailLink({
   collapsed: boolean;
   icon: ComponentType<{ className?: string }>;
   label: string;
-  to: "/app" | "/app/insights" | "/app/profile";
+  to: "/app" | "/app/insights" | "/app/knowledge" | "/app/profile";
   search?: Record<string, unknown>;
 }) {
   return (

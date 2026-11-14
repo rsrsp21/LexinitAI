@@ -129,12 +129,14 @@ function Videos() {
       positionSeconds: number,
       durationSeconds: number,
       state: VideoPlaybackState,
+      watchedSegments: Array<[number, number]>,
     ) => {
       if (!selected) return;
       const result = await saveVideoProgress(id, selected.video_id, {
         position_seconds: positionSeconds,
         duration_seconds: durationSeconds,
         state,
+        watched_segments: watchedSegments,
       });
       queryClient.setQueryData(
         ["video-catalog", id],
@@ -165,7 +167,7 @@ function Videos() {
               }
             : current,
       );
-      if (result.completed) {
+      if (result.completed && !selected.completed) {
         await queryClient.invalidateQueries({ queryKey: ["course", id] });
         await queryClient.invalidateQueries({ queryKey: ["courses"] });
       }
@@ -331,7 +333,9 @@ function Videos() {
               <div className="mt-4">
                 <div className="mb-2 flex justify-between text-xs text-muted-foreground">
                   <span>
-                    {selected.completed ? "Completed" : "Playback progress"}
+                    {selected.completed
+                      ? "Completed"
+                      : "Watched (50% needed to complete)"}
                   </span>
                   <span>{selected.progress_percent}%</span>
                 </div>
@@ -463,8 +467,9 @@ function Videos() {
                     </h3>
                     {!selected.completed && (
                       <p className="mt-2 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
-                        Finish the lecture to unlock submission. The questions
-                        are visible now so you know what ideas to listen for.
+                        Watch at least half of the lecture to unlock submission.
+                        The questions are visible now so you know what ideas to
+                        listen for.
                       </p>
                     )}
                     <div className="mt-4 grid gap-4">

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookOpen,
   BrainCircuit,
+  CheckCircle2,
   Check,
   ChevronDown,
   Circle,
@@ -28,6 +29,8 @@ import {
   type CourseModule,
   type CourseProgress,
 } from "@/lib/api";
+import { CourseGoalCard } from "@/components/course-goal";
+import { DeleteCourse } from "@/components/delete-course";
 import { preloadCoursePage } from "@/lib/route-prefetch";
 
 export const Route = createFileRoute("/app/session/$id/path")({
@@ -192,6 +195,12 @@ function CoursePage() {
           <ProgressOrb percentage={course.progress_percent} />
         </div>
 
+        <CourseGoalCard
+          sessionId={id}
+          goal={course.goal}
+          onChange={applyCourse}
+        />
+
         {nextActivity && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -232,9 +241,9 @@ function CoursePage() {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-200/20 via-transparent to-transparent" />
             <div className="relative flex flex-col items-center text-center">
               <motion.div
-                animate={{ 
+                animate={{
                   rotate: [0, -5, 5, -5, 5, 0],
-                  scale: [1, 1.1, 1.1, 1.1, 1.1, 1] 
+                  scale: [1, 1.1, 1.1, 1.1, 1.1, 1],
                 }}
                 transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
                 className="grid h-20 w-20 place-items-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 text-amber-950 shadow-lg shadow-amber-500/25"
@@ -245,7 +254,9 @@ function CoursePage() {
                 Course Completed!
               </h2>
               <p className="mt-2 max-w-xl text-muted-foreground">
-                Outstanding work! You've mastered all {course.total_modules} modules and earned your completion badge. Check your profile to view your trophy cabinet.
+                Outstanding work! You've mastered all {course.total_modules}{" "}
+                modules and earned your completion badge. Check your profile to
+                view your trophy cabinet.
               </p>
               <Link
                 to="/app/profile"
@@ -302,8 +313,68 @@ function CoursePage() {
             />
           ))}
         </div>
+        {course.final_assessment?.required && (
+          <FinalAssessmentCard
+            sessionId={id}
+            state={course.final_assessment.state}
+            bestPercent={course.final_assessment.best_percent}
+            passPercent={course.final_assessment.pass_percent}
+          />
+        )}
+        <DeleteCourse sessionId={id} topic={course.topic} />
       </section>
     </div>
+  );
+}
+
+function FinalAssessmentCard({
+  sessionId,
+  state,
+  bestPercent,
+  passPercent,
+}: {
+  sessionId: string;
+  state: string;
+  bestPercent: number | null;
+  passPercent: number;
+}) {
+  const passed = state === "passed";
+  const locked = state === "locked";
+  const detail = passed
+    ? `Passed with ${bestPercent}%.`
+    : locked
+      ? "Unlocks when every module is passed."
+      : state === "in_progress"
+        ? "You have an attempt in progress."
+        : state === "cooldown"
+          ? `Last score ${bestPercent}%. Review what you missed, then retake.`
+          : `New questions across the whole course. ${passPercent}% to pass and earn the badge.`;
+  return (
+    <Link
+      to="/app/session/$id/final"
+      params={{ id: sessionId }}
+      search={{ module: undefined }}
+      className={`mt-3 flex items-center gap-4 rounded-2xl border p-5 transition hover:border-accent/50 ${passed ? "border-accent/30 bg-accent/10" : "border-border bg-card"}`}
+    >
+      <span
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${passed ? "bg-accent text-accent-foreground" : locked ? "bg-muted text-muted-foreground" : "bg-accent/10 text-accent"}`}
+      >
+        {passed ? (
+          <CheckCircle2 className="h-5 w-5" />
+        ) : (
+          <BrainCircuit className="h-5 w-5" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-xl tracking-tight">
+          Final assessment
+        </span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">
+          {detail}
+        </span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+    </Link>
   );
 }
 
@@ -545,12 +616,7 @@ function ActivityRow({
         <Link
           to={ACTIVITY_ROUTES[activity.route]}
           params={{ id: sessionId }}
-          search={{
-            module: activity.module_id,
-            ...(activity.type === "assessment" && activity.latest_submission_id
-              ? { submission: activity.latest_submission_id }
-              : {}),
-          }}
+          search={{ module: activity.module_id }}
           className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
         >
           Open <ArrowRight className="h-3.5 w-3.5" />

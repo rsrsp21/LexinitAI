@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import hmac
+import logging
 from typing import Any
 
 from bson import ObjectId
@@ -14,7 +15,11 @@ from backend.lexinit.schemas.assessment import AssessmentType
 from backend.lexinit.schemas.generation import Difficulty
 
 
+logger = logging.getLogger(__name__)
+
 DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2}
+# Questions in a reattempt made of fresh questions.
+FRESH_ATTEMPT_SIZE = 3
 ACTIVE_ATTEMPT_STATUSES = {"active", "ready", "submitting"}
 
 
@@ -30,10 +35,16 @@ class AdaptiveAssessmentAttemptService:
         question_bank_collection,
         mastery_collection,
         secret_key: str,
+        submissions_collection=None,
+        question_refresher=None,
     ) -> None:
         self._attempts = attempts_collection
         self._question_bank = question_bank_collection
         self._mastery = mastery_collection
+        self._submissions = submissions_collection
+        # Callable(user_id, session_data, module_id, assessment_type, count)
+        # returning the course document with fresh questions appended.
+        self._question_refresher = question_refresher
         self._secret_key = secret_key.encode("utf-8")
 
     def start(
@@ -80,6 +91,45 @@ class AdaptiveAssessmentAttemptService:
             bank_questions = [
                 question for question in bank_questions if question.get("module_id") == module_id
             ]
+        # Answers are revealed after an attempt, so a reattempt should use
+        # questions the learner has not seen. When none are left, ask for
+        # fresh ones; if that is not possible, fall back to reusing questions.
+        preferred_ids: list[str] = []
+        if module_id:
+            seen_ids = self._seen_question_ids(
+                user_id=user_id,
+                session_id=session_data.get("_id", requested_session_id),
+                assessment_type=assessment_type,
+                module_id=module_id,
+                module_bank=bank_questions,
+            )
+            unseen = [question for question in bank_questions if question["_id"] not in seen_ids]
+            wanted = min(question_count, FRESH_ATTEMPT_SIZE)
+            if seen_ids and len(unseen) < wanted and self._question_refresher is not None:
+                try:
+                    session_data = self._question_refresher(
+                        user_id=user_id,
+                        session_data=session_data,
+                        module_id=module_id,
+                        assessment_type=assessment_type,
+                        count=wanted - len(unseen),
+                    )
+                    bank_questions = [
+                        question
+                        for question in self._ensure_private_question_bank(
+                            user_id=user_id,
+                            requested_session_id=requested_session_id,
+                            session_data=session_data,
+                            assessment_type=assessment_type,
+                        )
+                        if question.get("module_id") == module_id
+                    ]
+                    unseen = [question for question in bank_questions if question["_id"] not in seen_ids]
+                except Exception:
+                    logger.warning("assessment_question_refill_failed", exc_info=True)
+            if seen_ids and unseen:
+                preferred_ids = [question["_id"] for question in unseen]
+                bank_questions = unseen
         target_count = min(question_count, len(bank_questions))
         if target_count < 1:
             raise ApiError(
@@ -109,6 +159,7 @@ class AdaptiveAssessmentAttemptService:
             "answers": [],
             "answer_receipts": [],
             "question_sequence": [first["_id"]],
+            "preferred_question_ids": preferred_ids,
             "start_idempotency_key": idempotency_key,
             "finalize_idempotency_key": None,
             "submission_id": None,
@@ -188,16 +239,21 @@ class AdaptiveAssessmentAttemptService:
         next_question = None
         next_count = int(attempt.get("answered_count", 0)) + 1
         if next_count < int(attempt["target_count"]):
-            candidates = list(
-                self._question_bank.find(
-                    {
-                        "user_id": user_id,
-                        "session_id": attempt["session_id"],
-                        "assessment_type": attempt["assessment_type"],
-                        "_id": {"$nin": list(used_ids)},
-                    }
-                )
-            )
+            candidate_query = {
+                "user_id": user_id,
+                "session_id": attempt["session_id"],
+                "assessment_type": attempt["assessment_type"],
+                "_id": {"$nin": list(used_ids)},
+            }
+            if attempt.get("module_id"):
+                # Module assessments must only draw from that module's questions.
+                candidate_query["module_id"] = attempt["module_id"]
+            remaining_preferred = [
+                item for item in attempt.get("preferred_question_ids") or [] if item not in used_ids
+            ]
+            if remaining_preferred:
+                candidate_query["_id"] = {"$in": remaining_preferred}
+            candidates = list(self._question_bank.find(candidate_query))
             next_question = self._select_next_question(
                 user_id=user_id,
                 candidates=candidates,
@@ -305,7 +361,15 @@ class AdaptiveAssessmentAttemptService:
                 status_code=409,
                 code="question_unavailable",
             )
-        questions = [documents[question_id]["payload"] for question_id in question_ids]
+        questions = [
+            {
+                **documents[question_id]["payload"],
+                "bank_question_id": question_id,
+                "module_id": documents[question_id]["payload"].get("module_id")
+                or documents[question_id].get("module_id"),
+            }
+            for question_id in question_ids
+        ]
         answers = [item["selected_answer"] for item in locked["answers"]]
         return locked, questions, answers
 
@@ -404,6 +468,36 @@ class AdaptiveAssessmentAttemptService:
                 }
             )
         )
+
+    def _seen_question_ids(self, *, user_id, session_id, assessment_type, module_id, module_bank):
+        if self._submissions is None:
+            return set()
+        seen: set[str] = set()
+        for submission in self._submissions.find(
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                "assessment_type": assessment_type.value,
+                "module_id": module_id,
+            },
+            {"question_refs": 1},
+        ):
+            ids = [
+                item.get("bank_question_id")
+                for item in submission.get("question_refs") or []
+                if item.get("bank_question_id")
+            ]
+            if ids:
+                seen.update(ids)
+            else:
+                # Result saved before question tracking: assume the original
+                # module questions were all shown.
+                seen.update(
+                    question["_id"]
+                    for question in module_bank
+                    if (question.get("payload") or {}).get("generation_kind") != "refill"
+                )
+        return seen
 
     def _select_next_question(
         self,

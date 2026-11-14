@@ -14,6 +14,7 @@ import {
 import { renderToString } from "katex";
 
 import { MarkdownContent } from "@/components/markdown-content";
+import { ModuleConceptCoach, ModulePreCheck } from "@/components/module-coach";
 import { SessionBackButton } from "@/components/session-back-button";
 import { useSession } from "@/hooks/use-session";
 import { materialChapters, sessionTitle } from "@/lib/session-utils";
@@ -290,12 +291,18 @@ function Materials() {
                 </div>
               </div>
             )}
+            {activeModuleId && (
+              <ModulePreCheck sessionId={id} moduleId={activeModuleId} />
+            )}
             <MarkdownContent
               content={
                 chapter?.body ||
                 "This course does not have study materials yet."
               }
             />
+            {activeModuleId && (
+              <ModuleConceptCoach sessionId={id} moduleId={activeModuleId} />
+            )}
             {materialActivity && (
               <div className="mt-8 border-t border-border pt-6">
                 <button

@@ -317,6 +317,8 @@ export type SubmitAssessmentResult = {
 };
 
 export type AssessmentSubmissionQuestion = {
+  index?: number;
+  concept_ids?: string[];
   question: string;
   selected_answer: number | boolean | string | null;
   selected_option?: string | null;
@@ -339,6 +341,56 @@ export type AssessmentSubmissionDetail = {
   attempt_id?: string | null;
   created_at?: string | null;
   questions: AssessmentSubmissionQuestion[];
+  concepts?: SubmissionConcept[];
+};
+
+export type SubmissionConcept = {
+  concept_id: string;
+  concept_label: string;
+  asked: number;
+  missed: number;
+  current_mastery: number | null;
+  band: string | null;
+};
+
+export type ExplanationStyle =
+  "simpler" | "analogy" | "example" | "step_by_step";
+
+export type CoachCheckResult = {
+  check_id: string;
+  correct: boolean;
+  selected_answer: number | null;
+  correct_answer: number;
+  explanation: string;
+  misconception: string | null;
+};
+
+export type CoachCheck = {
+  check_id: string;
+  question: string;
+  options: string[];
+  difficulty: string;
+  concept_ids: string[];
+  answered: boolean;
+  result?: CoachCheckResult;
+};
+
+export type FixIt = {
+  fix_id: string;
+  question_index: number;
+  why_tempting: string;
+  key_idea: string;
+  check: CoachCheck | null;
+};
+
+export type CoachExplanation = {
+  explanation_id: string;
+  concept_id: string;
+  concept_label: string;
+  style: ExplanationStyle;
+  explanation: string;
+  takeaway: string;
+  helpful?: boolean | null;
 };
 
 export type AssessmentType = "mcq" | "truefalse" | "oneword";
@@ -750,6 +802,19 @@ export type CourseActivity = {
   route: "materials" | "videos" | "flashcards" | "assessments";
   status: "todo" | "completed";
   latest_submission_id?: string | null;
+  assessment_types?: CourseAssessmentTypeProgress[];
+};
+
+export type CourseAssessmentTypeProgress = {
+  type: AssessmentType;
+  question_count: number;
+  attempts: number;
+  best_percent: number | null;
+  passed: boolean;
+  latest_submission_id: string | null;
+  latest_score: number | null;
+  latest_total: number | null;
+  latest_at: string | null;
 };
 
 export type CourseModule = {
@@ -779,7 +844,103 @@ export type CourseProgress = {
   current_module_id: string | null;
   current_module_title: string | null;
   created_at?: string | null;
+  final_assessment?: FinalAssessmentState;
+  goal?: CourseGoal | null;
   modules: CourseModule[];
+};
+
+export type CourseGoal = {
+  target_date: string;
+  days_left: number;
+  remaining_minutes: number;
+  minutes_per_day: number;
+  status: "on_track" | "tight" | "overdue" | "done";
+  focus_module_id: string | null;
+  focus_module_title: string | null;
+};
+
+export type KnowledgeConcept = {
+  concept_id: string;
+  label: string;
+  prerequisite_ids: string[];
+  status: "new" | "weak" | "developing" | "proficient" | "mastered" | "fading";
+  current_mastery: number | null;
+  peak_mastery: number | null;
+  retention: number | null;
+  band: string | null;
+  due: boolean;
+  attempts: number;
+  last_practiced_at?: string;
+  next_review_at?: string;
+};
+
+export type KnowledgeMap = {
+  summary: {
+    concepts: number;
+    practised: number;
+    strong: number;
+    fading: number;
+    due: number;
+  };
+  courses: Array<{
+    session_id: string;
+    topic: string;
+    modules: Array<{
+      module_id: string;
+      title: string;
+      concepts: KnowledgeConcept[];
+    }>;
+  }>;
+};
+
+export type FinalAssessmentState = {
+  required: boolean;
+  passed: boolean;
+  state:
+    | "not_required"
+    | "locked"
+    | "available"
+    | "in_progress"
+    | "cooldown"
+    | "passed";
+  attempts: number;
+  best_percent: number | null;
+  last_percent: number | null;
+  pass_percent: number;
+  question_count: number;
+  active_final_id: string | null;
+  last_final_id: string | null;
+  retry_available_at: string | null;
+  modules_remaining?: Array<{ module_id: string; title: string }>;
+};
+
+export type FinalAssessmentQuestion = {
+  index: number;
+  type: AssessmentType;
+  question: string;
+  options: string[];
+};
+
+export type FinalAssessment = {
+  final_id: string;
+  session_id: string;
+  source_topic: string;
+  status: "active" | "grading" | "completed" | "expired";
+  pass_percent: number;
+  expires_at: string | null;
+  questions: FinalAssessmentQuestion[];
+  result?: {
+    score: number;
+    total: number;
+    percent: number;
+    passed: boolean;
+    pass_percent: number;
+    retry_available_at: string | null;
+    concepts: SubmissionConcept[];
+    questions: Array<
+      AssessmentSubmissionQuestion & { index: number; type: AssessmentType }
+    >;
+  } | null;
 };
 
 export function getCourse(sessionId: string) {
@@ -1024,6 +1185,7 @@ const dashboardAssessmentSchema = z.object({
   percentage: z.number().min(0).max(100),
   weak_topic: z.string(),
   created_at: z.string().nullable(),
+  module_id: z.string().nullable().optional(),
 });
 
 export type DashboardAssessment = z.infer<typeof dashboardAssessmentSchema>;
@@ -1188,6 +1350,8 @@ const assessmentSubmissionDetailSchema = z.object({
   created_at: z.string().nullable().optional(),
   questions: z.array(
     z.object({
+      index: z.number().int().optional(),
+      concept_ids: z.array(z.string()).optional(),
       question: z.string(),
       selected_answer: z
         .union([z.number(), z.boolean(), z.string()])
@@ -1199,6 +1363,18 @@ const assessmentSubmissionDetailSchema = z.object({
       explanation: z.string(),
     }),
   ),
+  concepts: z
+    .array(
+      z.object({
+        concept_id: z.string(),
+        concept_label: z.string(),
+        asked: z.number().int(),
+        missed: z.number().int(),
+        current_mastery: z.number().nullable(),
+        band: z.string().nullable(),
+      }),
+    )
+    .optional(),
 });
 const assessmentAttemptSchema = z.object({
   attempt_id: z.string(),
@@ -1246,6 +1422,156 @@ export function getAssessmentSubmission(submissionId: string) {
   return requestJson<unknown>(
     `/api/v1/assessment-submissions/${encodeURIComponent(submissionId)}`,
   ).then((data) => assessmentSubmissionDetailSchema.parse(data));
+}
+
+export function getKnowledgeMap() {
+  return requestJson<KnowledgeMap>("/api/v1/learners/me/knowledge-map");
+}
+
+export function setCourseGoal(sessionId: string, targetDate: string | null) {
+  return requestJson<CourseProgress>(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/goal`,
+    { method: "PUT", json: { target_date: targetDate } },
+  );
+}
+
+export function getFinalAssessmentStatus(sessionId: string) {
+  return requestJson<FinalAssessmentState>(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/final-assessment`,
+  );
+}
+
+export function startFinalAssessment(sessionId: string) {
+  return requestJson<FinalAssessment>(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/final-assessment`,
+    { method: "POST", json: {} },
+  );
+}
+
+export function getFinalAssessment(finalId: string) {
+  return requestJson<FinalAssessment>(
+    `/api/v1/final-assessments/${encodeURIComponent(finalId)}`,
+  );
+}
+
+export function submitFinalAssessment(
+  finalId: string,
+  answers: Array<number | boolean | string>,
+) {
+  return requestJson<FinalAssessment>(
+    `/api/v1/final-assessments/${encodeURIComponent(finalId)}/submit`,
+    { method: "POST", json: { answers } },
+  );
+}
+
+export type PreCheck = {
+  total: number;
+  answered: number;
+  correct: number;
+  checks: Array<CoachCheck & { concept_label: string }>;
+};
+
+export type ModuleCoachOverview = {
+  module_id: string;
+  module_title: string;
+  concepts: SubmissionConcept[];
+  pre_check_available: boolean;
+  pre_check: PreCheck | null;
+};
+
+export function getModuleCoachOverview(sessionId: string, moduleId: string) {
+  return requestJson<ModuleCoachOverview>(
+    `/api/v1/coach/sessions/${encodeURIComponent(sessionId)}/modules/${encodeURIComponent(moduleId)}`,
+  );
+}
+
+export function startPreCheck(sessionId: string, moduleId: string) {
+  return requestJson<PreCheck>(
+    `/api/v1/coach/sessions/${encodeURIComponent(sessionId)}/modules/${encodeURIComponent(moduleId)}/pre-check`,
+    { method: "POST", json: {} },
+  );
+}
+
+export type DailyMixCheck = CoachCheck & {
+  session_id: string;
+  concept_label: string;
+  course_topic: string;
+  reason: "due" | "weak";
+};
+
+export type DailyMix = {
+  set_id: string | null;
+  ready: boolean;
+  waiting_concepts?: number;
+  due_concepts?: number;
+  total?: number;
+  answered?: number;
+  correct?: number;
+  checks: DailyMixCheck[];
+};
+
+export function getDailyMix() {
+  return requestJson<DailyMix>("/api/v1/coach/daily-mix");
+}
+
+export function startDailyMix() {
+  return requestJson<DailyMix>("/api/v1/coach/daily-mix", {
+    method: "POST",
+    json: {},
+  });
+}
+
+export function getFixIt(submissionId: string, questionIndex: number) {
+  return requestJson<FixIt>("/api/v1/coach/fix-it", {
+    method: "POST",
+    json: { submission_id: submissionId, question_index: questionIndex },
+  });
+}
+
+export function explainConcept(
+  sessionId: string,
+  conceptId: string,
+  style: ExplanationStyle,
+) {
+  return requestJson<CoachExplanation>("/api/v1/coach/explain", {
+    method: "POST",
+    json: { session_id: sessionId, concept_id: conceptId, style },
+  });
+}
+
+export function sendExplanationFeedback(
+  explanationId: string,
+  helpful: boolean,
+) {
+  return requestJson<{ explanation_id: string; helpful: boolean }>(
+    `/api/v1/coach/explanations/${encodeURIComponent(explanationId)}/feedback`,
+    { method: "POST", json: { helpful } },
+  );
+}
+
+export function getCoachPreferences() {
+  return requestJson<{ explanation_style: ExplanationStyle | null }>(
+    "/api/v1/coach/preferences",
+  );
+}
+
+export function getPracticeSet(sessionId: string, conceptId: string) {
+  return requestJson<{
+    set_id: string;
+    concept_id: string;
+    concept_label: string;
+    checks: CoachCheck[];
+  }>("/api/v1/coach/practice", {
+    method: "POST",
+    json: { session_id: sessionId, concept_id: conceptId },
+  });
+}
+
+export function answerCoachCheck(checkId: string, answer: number) {
+  return requestJson<CoachCheckResult>(
+    `/api/v1/coach/checks/${encodeURIComponent(checkId)}/answer`,
+    { method: "POST", json: { answer } },
+  );
 }
 
 export function answerAssessmentAttempt(
@@ -1463,6 +1789,7 @@ export function saveVideoProgress(
     position_seconds: number;
     duration_seconds: number;
     state: VideoPlaybackState;
+    watched_segments?: Array<[number, number]>;
   },
 ) {
   return requestJson<unknown>(
@@ -1474,6 +1801,7 @@ export function saveVideoProgress(
         video_id: z.string(),
         position_seconds: z.number(),
         furthest_position_seconds: z.number(),
+        watched_seconds: z.number().optional(),
         duration_seconds: z.number(),
         progress_percent: z.number().int(),
         completed: z.boolean(),

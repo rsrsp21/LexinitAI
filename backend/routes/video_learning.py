@@ -114,6 +114,7 @@ def register_routes(app):
             position_seconds=payload.position_seconds,
             duration_seconds=payload.duration_seconds,
             state=payload.state,
+            watched_segments=payload.watched_segments,
         )
         return jsonify(result)
 

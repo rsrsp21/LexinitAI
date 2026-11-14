@@ -32,6 +32,9 @@ GUIDE_VERSION = "video-guide-v1"
 VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
+VIDEO_COMPLETION_RATIO = 0.5
+
+
 def utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
@@ -165,12 +168,10 @@ class VideoLearningService:
         position_seconds: float,
         duration_seconds: float,
         state: VideoPlaybackState,
+        watched_segments: list[tuple[float, float]] | None = None,
     ) -> dict[str, Any]:
         self._require_video(session_data, video_id)
         now = utcnow()
-        completed = state is VideoPlaybackState.ENDED and (
-            position_seconds >= duration_seconds * 0.8 or duration_seconds - position_seconds <= 20
-        )
         existing = self._progress.find_one(
             {
                 "user_id": ObjectId(user_id),
@@ -179,10 +180,20 @@ class VideoLearningService:
             }
         )
         furthest = max(float(existing.get("furthest_position_seconds") or 0) if existing else 0, position_seconds)
+        # Completion is based on real viewing time: the union of the stretches
+        # actually played, so skipping ahead or rewatching does not count.
+        watched_ranges = _merge_ranges(
+            [*(existing.get("watched_ranges") or [] if existing else []), *(watched_segments or [])],
+            duration_seconds,
+        )
+        watched_seconds = sum(end - start for start, end in watched_ranges)
+        completed = duration_seconds > 0 and watched_seconds >= duration_seconds * VIDEO_COMPLETION_RATIO
         update = {
             "$set": {
                 "position_seconds": round(position_seconds, 2),
                 "furthest_position_seconds": round(furthest, 2),
+                "watched_ranges": watched_ranges,
+                "watched_seconds": round(watched_seconds, 2),
                 "duration_seconds": round(duration_seconds, 2),
                 "state": state.value,
                 "updated_at": now,
@@ -672,11 +683,35 @@ def _duration_seconds(value: Any) -> int:
         return 0
 
 
+def _merge_ranges(ranges, duration_seconds: float) -> list[list[float]]:
+    """Clamp ranges to the video and merge overlapping or touching ones."""
+    clean = []
+    for item in ranges:
+        try:
+            start, end = float(item[0]), float(item[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        start, end = max(0.0, start), min(float(duration_seconds), end)
+        if end > start:
+            clean.append([start, end])
+    clean.sort()
+    merged: list[list[float]] = []
+    for start, end in clean:
+        if merged and start <= merged[-1][1] + 1.0:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [[round(start, 2), round(end, 2)] for start, end in merged]
+
+
 def _progress_percent(document: dict[str, Any], duration_seconds: int) -> int:
     duration = float(document.get("duration_seconds") or duration_seconds or 0)
     if duration <= 0:
         return 0
-    return min(100, round(float(document.get("furthest_position_seconds") or 0) / duration * 100))
+    if "watched_seconds" not in document and document.get("completed_at"):
+        # Progress saved before viewing time was tracked.
+        return min(100, round(float(document.get("furthest_position_seconds") or 0) / duration * 100))
+    return min(100, round(float(document.get("watched_seconds") or 0) / duration * 100))
 
 
 def _public_progress(document: dict[str, Any]) -> dict[str, Any]:
@@ -684,6 +719,7 @@ def _public_progress(document: dict[str, Any]) -> dict[str, Any]:
         "video_id": document["video_id"],
         "position_seconds": float(document.get("position_seconds") or 0),
         "furthest_position_seconds": float(document.get("furthest_position_seconds") or 0),
+        "watched_seconds": float(document.get("watched_seconds") or 0),
         "duration_seconds": float(document.get("duration_seconds") or 0),
         "progress_percent": _progress_percent(document, int(document.get("duration_seconds") or 0)),
         "completed": bool(document.get("completed_at")),

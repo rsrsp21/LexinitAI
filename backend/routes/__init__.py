@@ -12,6 +12,7 @@ from .security import register_routes as register_security_routes
 from .health import register_routes as register_health_routes
 from .course import register_routes as register_course_routes
 from .waitlist import register_routes as register_waitlist_routes
+from .coach import register_routes as register_coach_routes
 
 
 def register_routes(app):
@@ -26,6 +27,7 @@ def register_routes(app):
     register_health_routes(app)
     register_course_routes(app)
     register_waitlist_routes(app)
+    register_coach_routes(app)
     register_upload_routes(app)
     register_content_routes(app)
     register_api_routes(app)

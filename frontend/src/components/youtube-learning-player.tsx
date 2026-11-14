@@ -73,6 +73,7 @@ export function YouTubeLearningPlayer({
     positionSeconds: number,
     durationSeconds: number,
     state: VideoPlaybackState,
+    watchedSegments: Array<[number, number]>,
   ) => Promise<void> | void;
   onEnded?: () => void;
 }) {
@@ -95,17 +96,58 @@ export function YouTubeLearningPlayer({
         timerRef.current = null;
       }
     };
+    // Real viewing time: every second, if playback moved forward at a
+    // plausible pace (up to 2x speed), that stretch counts as watched.
+    // Seeks show up as large jumps and are ignored.
+    let pending: Array<[number, number]> = [];
+    let last: { position: number; at: number } | null = null;
+    const sample = () => {
+      const player = playerRef.current;
+      if (!player) return;
+      const position = player.getCurrentTime();
+      const now = performance.now();
+      if (last) {
+        const advanced = position - last.position;
+        const elapsed = (now - last.at) / 1000;
+        if (advanced > 0 && advanced <= elapsed * 2.25 + 0.5) {
+          const previous = pending[pending.length - 1];
+          if (previous && Math.abs(previous[1] - last.position) < 0.01) {
+            previous[1] = position;
+          } else {
+            pending.push([last.position, position]);
+          }
+        }
+      }
+      last = { position, at: now };
+    };
     const save = (state: VideoPlaybackState) => {
       const player = playerRef.current;
       if (!player) return Promise.resolve();
       const duration = player.getDuration();
-      const position = state === "ended" ? duration : player.getCurrentTime();
       if (duration <= 0) return Promise.resolve();
-      return Promise.resolve(progressRef.current(position, duration, state));
+      sample();
+      const position = player.getCurrentTime();
+      const segments = pending;
+      pending = [];
+      return Promise.resolve(
+        progressRef.current(position, duration, state, segments),
+      ).catch((cause) => {
+        pending = [...segments, ...pending];
+        throw cause;
+      });
     };
     const startTimer = () => {
       stopTimer();
-      timerRef.current = window.setInterval(() => save("playing"), 10_000);
+      const player = playerRef.current;
+      last = player
+        ? { position: player.getCurrentTime(), at: performance.now() }
+        : null;
+      let ticks = 0;
+      timerRef.current = window.setInterval(() => {
+        sample();
+        ticks += 1;
+        if (ticks % 10 === 0) void save("playing").catch(() => undefined);
+      }, 1_000);
     };
 
     loadYouTubeApi()
@@ -132,13 +174,15 @@ export function YouTubeLearningPlayer({
               if (data === 1) startTimer();
               if (data === 2) {
                 stopTimer();
-                save("paused");
+                void save("paused").catch(() => undefined);
+                last = null;
               }
               if (data === 0) {
                 stopTimer();
                 void save("ended")
                   .catch(() => undefined)
                   .finally(() => endedRef.current?.());
+                last = null;
               }
             },
           },
@@ -153,6 +197,8 @@ export function YouTubeLearningPlayer({
     return () => {
       cancelled = true;
       stopTimer();
+      // Keep the last few seconds watched before leaving this video.
+      if (pending.length) void save("paused").catch(() => undefined);
       playerRef.current?.destroy();
       playerRef.current = null;
     };

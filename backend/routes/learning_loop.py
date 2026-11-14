@@ -1,3 +1,4 @@
+import datetime
 import re
 
 from bson import ObjectId
@@ -14,7 +15,9 @@ from backend.lexinit.schemas import (
     StartAssessmentAttemptRequest,
 )
 from backend.lexinit.services import AdaptiveLearningService, AssessmentSubmissionService
+from backend.lexinit.domain.mastery.calculator import mastery_band, retention
 from backend.lexinit.services.assessment_attempts import AdaptiveAssessmentAttemptService
+from backend.lexinit.services.concept_coach import submission_question_refs
 from backend.routes.activity import _analyze_weak_topic
 from backend.session_store import get_user_session
 from backend.validation import valid_safe_id
@@ -57,7 +60,15 @@ def _attempt_service() -> AdaptiveAssessmentAttemptService:
         question_bank_collection=mongo.db.assessment_question_bank,
         mastery_collection=mongo.db.concept_mastery,
         secret_key=str(secret),
+        submissions_collection=mongo.db.assessment_submissions,
+        question_refresher=_refill_questions,
     )
+
+
+def _refill_questions(**kwargs):
+    from backend.routes.coach import coach_service
+
+    return coach_service().refill_module_questions(**kwargs)
 
 
 def _adaptive_service() -> AdaptiveLearningService:
@@ -94,6 +105,7 @@ def register_routes(app):
                     "total": 1,
                     "weak_topic": 1,
                     "created_at": 1,
+                    "module_id": 1,
                 },
             )
             .sort("created_at", -1)
@@ -113,6 +125,7 @@ def register_routes(app):
                     "percentage": round(score / total * 100, 1) if total else 0,
                     "weak_topic": str(item.get("weak_topic") or ""),
                     "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else None,
+                    "module_id": item.get("module_id"),
                 }
             )
         return jsonify({"assessments": submissions})
@@ -139,11 +152,27 @@ def register_routes(app):
 
         questions = submission.get("questions") or []
         feedback = submission.get("feedback") or []
+        refs = submission_question_refs(mongo.db, submission)
+        session_data = get_user_session(str(user_id), str(submission.get("session_id") or "")) or {}
+        concept_names = {
+            concept["concept_id"]: str(concept.get("name") or "")
+            for module in (session_data.get("curriculum") or {}).get("modules") or []
+            for concept in module.get("concepts") or []
+            if concept.get("concept_id")
+        }
         question_results = []
+        concept_stats: dict[str, dict] = {}
         for index, question in enumerate(questions):
             item_feedback = feedback[index] if index < len(feedback) else {}
+            concept_ids = [item for item in refs[index]["concept_ids"] if item in concept_names]
+            for concept_id in concept_ids:
+                stats = concept_stats.setdefault(concept_id, {"asked": 0, "missed": 0})
+                stats["asked"] += 1
+                stats["missed"] += 0 if item_feedback.get("correct") else 1
             question_results.append(
                 {
+                    "index": index,
+                    "concept_ids": concept_ids,
                     "question": str(question.get("question") or f"Question {index + 1}"),
                     "selected_answer": question.get("selected_answer"),
                     "selected_option": question.get("selected_option"),
@@ -171,6 +200,7 @@ def register_routes(app):
                 "attempt_id": submission.get("attempt_id"),
                 "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else None,
                 "questions": question_results,
+                "concepts": _submission_concepts(user_id, concept_stats, concept_names),
             }
         )
 
@@ -265,6 +295,7 @@ def register_routes(app):
                 answers=answers,
                 questions_override=questions,
                 attempt_id=str(locked["_id"]),
+                module_id=locked.get("module_id"),
             )
         except AssessmentSubmissionError as exc:
             attempt_service.reset_finalization(locked["_id"])
@@ -288,6 +319,48 @@ def register_routes(app):
         response = outcome.public_response()
         attempt_service.complete_finalization(locked["_id"], response)
         return jsonify(response)
+
+
+def _submission_concepts(user_id, concept_stats, concept_names):
+    """Concepts this result touched, weakest first, with current mastery."""
+    if not concept_stats:
+        return []
+    now = datetime.datetime.now(datetime.timezone.utc)
+    mastery = {
+        item["concept_id"]: item
+        for item in mongo.db.concept_mastery.find(
+            {"user_id": user_id, "concept_id": {"$in": list(concept_stats)}}
+        )
+    }
+    concepts = []
+    for concept_id, stats in concept_stats.items():
+        record = mastery.get(concept_id)
+        current = None
+        band = None
+        if record:
+            current = round(
+                float(record.get("mastery_probability") or 0)
+                * retention(record["last_practiced_at"], record["next_review_at"], now),
+                4,
+            )
+            band = mastery_band(current).value
+        concepts.append(
+            {
+                "concept_id": concept_id,
+                "concept_label": concept_names[concept_id],
+                "asked": stats["asked"],
+                "missed": stats["missed"],
+                "current_mastery": current,
+                "band": band,
+            }
+        )
+    concepts.sort(
+        key=lambda item: (
+            -item["missed"],
+            item["current_mastery"] if item["current_mastery"] is not None else 1,
+        )
+    )
+    return concepts
 
 
 def payload_assessment_type(attempt):

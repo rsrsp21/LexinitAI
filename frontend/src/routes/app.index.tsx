@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { DailyMixCard } from "@/components/daily-mix";
 import { LearnerInsights } from "@/components/learner-insights";
 import { CourseDashboard } from "@/components/course-dashboard";
 import { GenerationProgressCard } from "@/components/generation-progress-card";
@@ -157,6 +158,7 @@ function DashboardHome() {
         </Link>
       </motion.header>
 
+      <DailyMixCard />
       <CourseDashboard />
       <LearnerInsights />
     </div>

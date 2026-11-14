@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from backend.extensions import mongo
 from backend.lexinit.api.validation import parse_json_model
 from backend.lexinit.schemas.profile import ProfileType, ProfileUpdateRequest
-from backend.session_store import delete_user_session, get_user_session, list_user_sessions
+from backend.session_store import get_user_session, list_user_sessions
 from backend.validation import clean_string, valid_safe_id, validate_password
 
 
@@ -221,11 +221,23 @@ def register_routes(app):
         if confirm_code != expected_code:
             return jsonify({"message": "Confirmation code does not match."}), 400
 
-        result = delete_user_session(user["_id"], session_id)
-        if result.deleted_count != 1:
-            return jsonify({"message": "Session could not be deleted."}), 500
+        from backend.lexinit.repositories import MongoAdaptiveLearningRepository
+        from backend.lexinit.services.course_deletion import delete_course
 
-        return jsonify({"success": True, "message": "Session deleted."})
+        deleted = delete_course(
+            mongo.db,
+            MongoAdaptiveLearningRepository(
+                evidence_collection=mongo.db.mastery_evidence,
+                mastery_collection=mongo.db.concept_mastery,
+                decisions_collection=mongo.db.adaptation_decisions,
+            ),
+            user["_id"],
+            session_data,
+        )
+        if deleted.get("sessions") != 1:
+            return jsonify({"message": "Course could not be deleted."}), 500
+
+        return jsonify({"success": True, "message": "Course deleted."})
 
     @app.route("/api/v1/logout", methods=["POST"])
     @app.route("/api/logout", methods=["POST"])

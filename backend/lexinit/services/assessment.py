@@ -11,6 +11,7 @@ from backend.lexinit.repositories.assessments import AssessmentSubmissionReposit
 from backend.lexinit.schemas.assessment import AssessmentSubmissionOutcome, AssessmentType
 from backend.lexinit.schemas.adaptive import AdaptiveUpdateResult
 from backend.lexinit.services.adaptive import AdaptiveLearningService
+from backend.lexinit.services.concept_coach import question_ref
 
 
 SCORE_FIELDS: dict[AssessmentType, str] = {
@@ -41,6 +42,7 @@ class AssessmentSubmissionService:
         answers: list[Any],
         questions_override: list[dict[str, Any]] | None = None,
         attempt_id: str | None = None,
+        module_id: str | None = None,
     ) -> AssessmentSubmissionOutcome:
         questions = questions_override or questions_for_assessment(session_data, assessment_type)
         grading = grade_assessment(assessment_type, questions, answers)
@@ -82,7 +84,17 @@ class AssessmentSubmissionService:
             "created_at": now,
             "grading_version": 1,
             "attempt_id": attempt_id,
-            "module_id": next(iter(module_ids)) if len(module_ids) == 1 else None,
+            # Concepts, module and misconception per question, so results can
+            # offer targeted help long after the attempt record has expired.
+            "question_refs": [
+                {
+                    **question_ref(question, snapshot, assessment_type.value),
+                    "bank_question_id": question.get("bank_question_id"),
+                }
+                for question, snapshot in zip(questions, question_snapshots)
+            ],
+            "module_id": module_id
+            or (next(iter(module_ids)) if len(module_ids) == 1 else None),
         }
         self._repository.insert(submission)
 
