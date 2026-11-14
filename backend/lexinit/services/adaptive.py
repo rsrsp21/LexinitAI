@@ -91,6 +91,16 @@ def _misconception(
     return identifier, label
 
 
+def _guess_probability(assessment_type: AssessmentType, question: dict[str, Any]) -> float:
+    if assessment_type is AssessmentType.TRUE_FALSE:
+        return 0.5
+    if assessment_type is AssessmentType.MCQ:
+        options = question.get("options")
+        count = len(options) if isinstance(options, list) and len(options) >= 2 else 4
+        return round(1 / count, 4)
+    return 0.0
+
+
 class AdaptiveLearningService:
     def __init__(self, repository: AdaptiveLearningRepository) -> None:
         self._repository = repository
@@ -106,11 +116,20 @@ class AdaptiveLearningService:
         questions: list[dict[str, Any]],
         grading: GradingResult,
         observed_at: datetime,
+        source_kind: str = "assessment",
+        evidence_weight: float = 1.0,
     ) -> AdaptiveUpdateResult:
         source_topic = str(session_data.get("topic") or "Untitled course").strip()
         session_id = str(session_data.get("_id", requested_session_id))
         fallback_concept_id = legacy_topic_concept_id(source_topic)
         result = AdaptiveUpdateResult()
+        # The curriculum is the source of truth for concept names.
+        curriculum_labels = {
+            concept["concept_id"]: str(concept.get("name") or "").strip()[:200]
+            for module in (session_data.get("curriculum") or {}).get("modules") or []
+            for concept in module.get("concepts") or []
+            if concept.get("concept_id") and concept.get("name")
+        }
 
         for index, (question, feedback, snapshot) in enumerate(
             zip(questions, grading.feedback, grading.question_snapshots, strict=True)
@@ -137,13 +156,17 @@ class AdaptiveLearningService:
                     session_id=session_id,
                     question_id=_question_id(question, session_id, index),
                     concept_id=concept_id,
-                    concept_label=_concept_label(question, concept_id, source_topic),
+                    concept_label=curriculum_labels.get(concept_id)
+                    or _concept_label(question, concept_id, source_topic),
                     correct=feedback.correct,
                     difficulty=difficulty,
                     misconception_id=misconception_id,
                     misconception_label=misconception_label,
                     prerequisite_concept_ids=prerequisite_ids,
                     observed_at=observed_at,
+                    source_kind=source_kind,
+                    evidence_weight=evidence_weight,
+                    guess_probability=_guess_probability(assessment_type, question),
                 )
                 self._repository.add_evidence(evidence)
                 all_evidence = self._repository.list_evidence(user_id, concept_id)

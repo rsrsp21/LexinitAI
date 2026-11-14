@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -41,6 +41,9 @@ class MasteryEvidence(BaseModel):
     observed_at: datetime
     source_kind: str = "assessment"
     evidence_weight: float = Field(default=1.0, gt=0, le=1.0)
+    # Chance of answering correctly by guessing (0.5 for True/False,
+    # 1/options for multiple choice, 0 for recalled answers).
+    guess_probability: float = Field(default=0.0, ge=0, lt=1)
     evidence_version: int = 1
 
 
@@ -62,11 +65,18 @@ class ConceptMastery(BaseModel):
     next_review_at: datetime
     algorithm_version: int = 1
 
-    def public_dict(self) -> dict:
+    def public_dict(self, now: datetime | None = None) -> dict:
+        from backend.lexinit.domain.mastery.calculator import retention
+
+        moment = now or datetime.now(timezone.utc)
+        remembered = retention(self.last_practiced_at, self.next_review_at, moment)
         return {
             "concept_id": self.concept_id,
             "concept_label": self.concept_label,
             "mastery_probability": self.mastery_probability,
+            # Mastery adjusted for forgetting since the last practice.
+            "current_mastery": round(self.mastery_probability * remembered, 4),
+            "retention": remembered,
             "confidence": self.confidence,
             "band": self.band.value,
             "attempts": self.attempts,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from backend.lexinit.schemas.assessment import (
@@ -60,8 +61,75 @@ def _normalize_stored_boolean(value: Any) -> bool | None:
     return None
 
 
+_LEADING_ARTICLE_RE = re.compile(r"^(?:a|an|the)\s+")
+_NON_WORD_RE = re.compile(r"[^\w\s]", re.UNICODE)
+# Longer answers tolerate one or two typos; short ones must match exactly,
+# because a single changed letter there is usually a different word.
+FUZZY_MIN_LENGTH = 5
+FUZZY_TWO_TYPO_LENGTH = 10
+ACCEPTED_ANSWER_FIELDS = ("accepted_answers", "alternative_answers", "aliases")
+
+
 def _normalize_text_answer(value: Any) -> str:
-    return re.sub(r"[.!?]+$", "", str(value or "").strip().casefold())
+    text = unicodedata.normalize("NFKC", str(value or "")).casefold().strip()
+    text = text.replace("-", " ").replace("_", " ")
+    text = _NON_WORD_RE.sub("", text)
+    text = " ".join(text.split())
+    return _LEADING_ARTICLE_RE.sub("", text)
+
+
+def _accepted_text_answers(question: dict[str, Any], correct_answer: str) -> list[str]:
+    accepted = [correct_answer]
+    for field in ACCEPTED_ANSWER_FIELDS:
+        values = question.get(field)
+        if isinstance(values, list):
+            accepted.extend(str(item) for item in values[:12] if str(item or "").strip())
+    return accepted
+
+
+def _edit_distance(left: str, right: str, limit: int) -> int:
+    """Levenshtein distance, returning limit + 1 as soon as it is exceeded."""
+    if abs(len(left) - len(right)) > limit:
+        return limit + 1
+    previous = list(range(len(right) + 1))
+    for row, left_char in enumerate(left, start=1):
+        current = [row]
+        for column, right_char in enumerate(right, start=1):
+            current.append(
+                min(
+                    previous[column] + 1,
+                    current[column - 1] + 1,
+                    previous[column - 1] + (left_char != right_char),
+                )
+            )
+        if min(current) > limit:
+            return limit + 1
+        previous = current
+    return previous[-1]
+
+
+def text_answer_matches(submitted: Any, accepted_answers: list[str]) -> bool:
+    """True when a typed answer matches any accepted answer, allowing for
+    case, punctuation, a leading article, and small typos in longer words."""
+    answer = _normalize_text_answer(submitted)
+    if not answer:
+        return False
+    for candidate in accepted_answers:
+        expected = _normalize_text_answer(candidate)
+        if not expected:
+            continue
+        if answer == expected or answer.replace(" ", "") == expected.replace(" ", ""):
+            return True
+        if any(character.isdigit() for character in expected + answer):
+            continue  # numbers, dates and formulas must be exact
+        if min(len(answer), len(expected)) < FUZZY_MIN_LENGTH:
+            continue
+        # One typo in a medium word, two in a long one. Tighter than a
+        # similarity ratio, which would accept "mitosis" for "meiosis".
+        allowed = 2 if min(len(answer), len(expected)) >= FUZZY_TWO_TYPO_LENGTH else 1
+        if answer[0] == expected[0] and _edit_distance(answer, expected, allowed) <= allowed:
+            return True
+    return False
 
 
 def _question_text(question: dict[str, Any], index: int) -> str:
@@ -139,7 +207,9 @@ def grade_assessment(
             correct_answer = str(stored_answer or "").strip()
             if not correct_answer or len(correct_answer) > 200:
                 raise AssessmentIntegrityError(f"Stored question {index + 1} has an invalid correct answer.")
-            is_correct = _normalize_text_answer(submitted_answer) == _normalize_text_answer(correct_answer)
+            is_correct = text_answer_matches(
+                submitted_answer, _accepted_text_answers(question, correct_answer)
+            )
 
         explanation = str(question.get("explanation") or "").strip()
         if is_correct:

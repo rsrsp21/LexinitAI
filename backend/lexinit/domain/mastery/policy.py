@@ -7,6 +7,7 @@ from backend.lexinit.schemas.adaptive import (
     MasteryBand,
     MasteryEvidence,
 )
+from backend.lexinit.domain.mastery.calculator import MIN_RELIABLE_CONFIDENCE
 from backend.lexinit.schemas.generation import Difficulty
 
 
@@ -35,10 +36,23 @@ def choose_adaptation(
         target_difficulty = Difficulty.EASY
         reason_codes = ["repeated_misconception", "incorrect_response"]
         target_concept_ids = [mastery.concept_id]
-    elif not latest_evidence.correct and latest_evidence.prerequisite_concept_ids:
+    elif mastery.confidence < MIN_RELIABLE_CONFIDENCE:
+        # Too little evidence to label the learner either way: ask more
+        # questions at the same level before remediating or advancing.
+        action = AdaptiveAction.TARGETED_PRACTICE
+        target_difficulty = latest_evidence.difficulty
+        reason_codes = ["insufficient_evidence"]
+        target_concept_ids = [mastery.concept_id]
+    elif (
+        not latest_evidence.correct
+        and latest_evidence.prerequisite_concept_ids
+        and mastery.mastery_probability < 0.5
+    ):
+        # One slip on a concept the learner mostly knows is not a
+        # prerequisite gap; only step back when mastery is actually low.
         action = AdaptiveAction.PREREQUISITE_REMEDIATION
         target_difficulty = Difficulty.EASY
-        reason_codes = ["incorrect_response", "prerequisite_available"]
+        reason_codes = ["incorrect_response", "mastery_below_0_50", "prerequisite_available"]
         target_concept_ids = list(latest_evidence.prerequisite_concept_ids)
     elif mastery.band is MasteryBand.WEAK:
         action = AdaptiveAction.WEAK_TOPIC_REMEDIATION
@@ -78,4 +92,5 @@ def choose_adaptation(
         target_concept_ids=target_concept_ids,
         target_objective_ids=list(target_objective_ids or []),
         created_at=latest_evidence.observed_at,
+        policy_version=2,
     )
