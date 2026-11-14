@@ -178,3 +178,15 @@ def test_a_reported_question_is_not_asked_again(client, db, course, user):
     flagged = db.assessment_question_bank.find_one({"user_id": user["_id"], "reported": True})
     assert flagged["_id"] == asked[0]["question_id"]
     assert db.question_reports.count_documents({"user_id": user["_id"]}) == 1
+
+
+def test_course_mastery_lists_practised_concepts_only(client, db, course):
+    url = f"/api/v1/coach/sessions/{course['_id']}/mastery"
+    assert client.get(url).get_json()["concepts"] == {}
+    module = course["curriculum"]["modules"][0]
+    take(client, db, start(client, course, module["module_id"], "mcq"), wrong=4)
+    concepts = client.get(url).get_json()["concepts"]
+    practised = module["concepts"][0]["concept_id"]
+    assert list(concepts) == [practised]
+    assert concepts[practised]["band"] == "weak"
+    assert 0 < concepts[practised]["current_mastery"] < 0.4

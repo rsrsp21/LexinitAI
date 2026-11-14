@@ -351,6 +351,31 @@ class ConceptCoachService:
             "checks": [_public_check(check) for check in checks],
         }
 
+    # ----------------------------------------------------------- course mastery
+
+    def course_mastery(self, *, user_id: str, session_id: str) -> dict[str, Any]:
+        """Current mastery (after forgetting) for every concept in a course,
+        so study activities can put weak concepts first."""
+        user_object_id = ObjectId(user_id)
+        session_data = self._session(user_object_id, session_id)
+        labels = _concept_labels(session_data)
+        now = utcnow()
+        concepts: dict[str, dict[str, Any]] = {}
+        for record in self._db.concept_mastery.find(
+            {"user_id": user_object_id, "concept_id": {"$in": list(labels)}}
+        ):
+            current = round(
+                float(record.get("mastery_probability") or 0)
+                * retention(record["last_practiced_at"], record["next_review_at"], now),
+                4,
+            )
+            concepts[record["concept_id"]] = {
+                "concept_label": labels[record["concept_id"]],
+                "current_mastery": current,
+                "band": mastery_band(current).value,
+            }
+        return {"session_id": str(session_data["_id"]), "concepts": concepts}
+
     # --------------------------------------------------------------- pre-check
 
     def module_overview(self, *, user_id: str, session_id: str, module_id: str) -> dict[str, Any]:

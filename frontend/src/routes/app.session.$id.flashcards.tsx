@@ -8,7 +8,12 @@ import { SessionBackButton } from "@/components/session-back-button";
 import { flashcards, sessionTitle } from "@/lib/session-utils";
 import { preloadCoursePage } from "@/lib/route-prefetch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getCourse, setCourseActivity } from "@/lib/api";
+import {
+  getCourse,
+  getCourseMastery,
+  setCourseActivity,
+  weakestMastery,
+} from "@/lib/api";
 import { CheckCircle2, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -31,14 +36,38 @@ function Flashcards() {
   const moduleTitle = session?.curriculum?.modules.find(
     (item) => item.module_id === module,
   )?.title;
+  const mastery = useQuery({
+    queryKey: ["course-mastery", id],
+    queryFn: () => getCourseMastery(id),
+    staleTime: 15_000,
+  });
+  // "weakest" reviews the whole course, starting with the cards whose
+  // concepts the learner knows least. Unpractised concepts sit in the middle.
+  const [order, setOrder] = useState<"module" | "weakest">("module");
   const cards = useMemo(() => {
     const all = flashcards(session);
+    if (order === "weakest") {
+      return all
+        .map((card, position) => ({
+          card,
+          position,
+          score: weakestMastery(mastery.data, card.conceptIds) ?? 0.5,
+        }))
+        .sort(
+          (left, right) =>
+            left.score - right.score || left.position - right.position,
+        )
+        .map((item) => item.card);
+    }
     return module ? all.filter((card) => card.moduleId === module) : all;
-  }, [module, session]);
+  }, [mastery.data, module, order, session]);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const card = cards[index];
+  const cardMastery = card
+    ? weakestMastery(mastery.data, card.conceptIds)
+    : null;
 
   const course = useQuery({
     queryKey: ["course", id],
@@ -109,8 +138,30 @@ function Flashcards() {
             </span>
             <span className="rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5 text-accent">
               <span className="font-medium">Module:</span>{" "}
-              {moduleTitle || "All modules"}
+              {order === "weakest"
+                ? "All modules"
+                : moduleTitle || "All modules"}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                setOrder(order === "weakest" ? "module" : "weakest");
+                setIndex(0);
+                setFlipped(false);
+              }}
+              aria-pressed={order === "weakest"}
+              className={`rounded-full border px-3 py-1.5 font-medium transition ${order === "weakest" ? "border-accent bg-accent text-accent-foreground" : "border-border bg-background/40 hover:bg-muted"}`}
+            >
+              Weakest first
+            </button>
+            {cardMastery !== null && (
+              <span className="rounded-full border border-border bg-background/40 px-3 py-1.5">
+                <span className="font-medium text-foreground">
+                  Your mastery:
+                </span>{" "}
+                {Math.round(cardMastery * 100)}%
+              </span>
+            )}
           </div>
         )}
 

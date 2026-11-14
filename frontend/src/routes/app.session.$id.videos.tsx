@@ -21,9 +21,11 @@ import { sessionTitle } from "@/lib/session-utils";
 import {
   apiErrorMessage,
   createIdempotencyKey,
+  getCourseMastery,
   getVideoCatalog,
   getVideoStudyGuide,
   saveVideoProgress,
+  weakestMastery,
   submitVideoRetrievalCheck,
   type VideoCatalogItem,
   type VideoPlaybackState,
@@ -61,6 +63,14 @@ function Videos() {
   }, [catalog.data?.videos, module]);
   const selected =
     videos.find((video) => video.video_id === selectedId) ?? videos[0];
+  const courseMastery = useQuery({
+    queryKey: ["course-mastery", id],
+    queryFn: () => getCourseMastery(id),
+    staleTime: 15_000,
+  });
+  const lectureMastery = selected
+    ? weakestMastery(courseMastery.data, selected.concept_ids ?? [])
+    : null;
 
   useEffect(() => {
     if (!catalog.data || metadataHydrationRef.current === id) return;
@@ -314,6 +324,15 @@ function Videos() {
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                   <span>{selected.recommendation_reason}</span>
                 </div>
+                {lectureMastery !== null && (
+                  <p className="mt-2 text-muted-foreground">
+                    {lectureMastery < 0.4
+                      ? `You are at ${Math.round(lectureMastery * 100)}% on these concepts. Watch this one closely and try the quick check after.`
+                      : lectureMastery < 0.65
+                        ? `You are at ${Math.round(lectureMastery * 100)}% on these concepts. This lecture should fill the gaps.`
+                        : `You are at ${Math.round(lectureMastery * 100)}% on these concepts. You can skim this lecture.`}
+                  </p>
+                )}
                 {selected.coverage_labels.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="self-center text-xs font-semibold text-foreground">

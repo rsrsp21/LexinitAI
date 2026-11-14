@@ -148,6 +148,14 @@ def register_routes(app):
             )
         )
 
+    @app.route("/api/v1/coach/sessions/<session_id>/mastery")
+    def coach_course_mastery(session_id):
+        return jsonify(
+            coach_service().course_mastery(
+                user_id=_user_id(), session_id=_safe_session_id(session_id)
+            )
+        )
+
     @app.route("/api/v1/coach/sessions/<session_id>/modules/<module_id>")
     def coach_module_overview(session_id, module_id):
         return jsonify(

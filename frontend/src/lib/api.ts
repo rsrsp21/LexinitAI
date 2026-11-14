@@ -1464,6 +1464,32 @@ export function submitFinalAssessment(
   );
 }
 
+export type CourseMastery = {
+  session_id: string;
+  concepts: Record<
+    string,
+    { concept_label: string; current_mastery: number; band: string }
+  >;
+};
+
+export function getCourseMastery(sessionId: string) {
+  return requestJson<CourseMastery>(
+    `/api/v1/coach/sessions/${encodeURIComponent(sessionId)}/mastery`,
+  );
+}
+
+/** Lowest current mastery among the given concepts, or null when none of
+ * them has been practised yet. */
+export function weakestMastery(
+  mastery: CourseMastery | undefined,
+  conceptIds: string[],
+) {
+  const values = conceptIds
+    .map((conceptId) => mastery?.concepts[conceptId]?.current_mastery)
+    .filter((value): value is number => typeof value === "number");
+  return values.length ? Math.min(...values) : null;
+}
+
 export type PreCheck = {
   total: number;
   answered: number;
