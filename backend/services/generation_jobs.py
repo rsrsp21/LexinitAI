@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import os
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -273,7 +272,7 @@ def _run_generation_job(app, job_id):
                 lease_expires_at=None,
             )
             refund_generation_quota(job_id)
-        except Exception as exc:
+        except Exception:
             app.logger.exception("Generation run %s failed", job_id)
             update_generation_run(
                 job_id,

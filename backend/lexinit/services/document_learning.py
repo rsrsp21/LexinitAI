@@ -361,8 +361,6 @@ class DocumentLearningService:
                 document.close()
         if self._vision_client_factory is None:
             raise ValueError("Image text extraction is not configured.")
-        from google.cloud import vision
-
         return [(1, _ocr_image(self._vision_client_factory(), content))]
 
     def _set_status(self, source_id: ObjectId, status: str) -> None:

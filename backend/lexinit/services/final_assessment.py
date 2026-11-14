@@ -186,7 +186,8 @@ class FinalAssessmentService:
         if len(verified) >= FINAL_MIN_QUESTIONS:
             questions = verified
         now = utcnow()
-        final_id = f"final_{hashlib.sha256(f'{user_id}|{session_data['_id']}|{now.isoformat()}'.encode()).hexdigest()[:28]}"
+        seed = f"{user_id}|{session_data['_id']}|{now.isoformat()}"
+        final_id = f"final_{hashlib.sha256(seed.encode()).hexdigest()[:28]}"
         random.Random(final_id).shuffle(questions)
         document = {
             "_id": final_id,

@@ -18,8 +18,6 @@ import hashlib
 import json
 import os
 import secrets
-import shutil
-import struct
 import tempfile
 import zipfile
 from datetime import datetime, timezone

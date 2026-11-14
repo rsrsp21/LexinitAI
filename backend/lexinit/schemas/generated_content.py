@@ -17,11 +17,6 @@ class FlashcardDraft(_ReferencedItem):
     answer: str = Field(min_length=1, max_length=300)
 
 
-class FlashcardSet(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    flashcards: list[FlashcardDraft] = Field(min_length=10, max_length=10)
-
-
 class MCQMisconception(BaseModel):
     model_config = ConfigDict(extra="forbid")
     option_index: int = Field(ge=0, le=3)
@@ -48,21 +43,11 @@ class MCQDraft(_ReferencedItem):
         return self
 
 
-class MCQSet(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    questions: list[MCQDraft] = Field(min_length=10, max_length=10)
-
-
 class TrueFalseDraft(_ReferencedItem):
     question: str = Field(min_length=5, max_length=500)
     answer: bool
     explanation: str = Field(min_length=3, max_length=1000)
     misconception_if_wrong: str | None = Field(default=None, max_length=300)
-
-
-class TrueFalseSet(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    questions: list[TrueFalseDraft] = Field(min_length=10, max_length=10)
 
 
 class OneWordDraft(_ReferencedItem):
@@ -78,8 +63,3 @@ class OneWordDraft(_ReferencedItem):
         if not re.fullmatch(r"[\w-]+", cleaned, flags=re.UNICODE):
             raise ValueError("One-word answers may contain one word or a hyphenated word.")
         return cleaned
-
-
-class OneWordSet(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    questions: list[OneWordDraft] = Field(min_length=10, max_length=10)
