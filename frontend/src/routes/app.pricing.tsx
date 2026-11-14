@@ -58,7 +58,8 @@ function PricingPage() {
           Upgrade your learning
         </h1>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          You are currently on the Free plan. More advanced plans are coming soon to support heavier study sessions and exam preparation.
+          You are currently on the Free plan. More advanced plans are coming
+          soon to support heavier study sessions and exam preparation.
         </p>
       </header>
 

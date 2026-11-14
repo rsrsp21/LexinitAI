@@ -46,14 +46,19 @@ function Flashcards() {
     enabled: Boolean(id),
   });
 
-  const currentModule = course.data?.modules.find(m => m.module_id === module);
-  const activity = currentModule?.activities.find(a => a.type === "flashcards");
+  const currentModule = course.data?.modules.find(
+    (m) => m.module_id === module,
+  );
+  const activity = currentModule?.activities.find(
+    (a) => a.type === "flashcards",
+  );
 
   const markCompletedMutation = useMutation({
-    mutationFn: () => setCourseActivity(id!, activity!.activity_id, "completed"),
+    mutationFn: () =>
+      setCourseActivity(id!, activity!.activity_id, "completed"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["course", id] });
-    }
+    },
   });
 
   useEffect(() => {
@@ -236,18 +241,24 @@ function Flashcards() {
               />
             </div>
 
-            {index === cards.length - 1 && activity && activity.status !== "completed" && (
-              <div className="mt-8 flex justify-center">
-                <Button 
-                   onClick={() => markCompletedMutation.mutate()} 
-                   disabled={markCompletedMutation.isPending}
-                   className="rounded-full px-6"
-                >
-                  {markCompletedMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                  Mark as completed
-                </Button>
-              </div>
-            )}
+            {index === cards.length - 1 &&
+              activity &&
+              activity.status !== "completed" && (
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={() => markCompletedMutation.mutate()}
+                    disabled={markCompletedMutation.isPending}
+                    className="rounded-full px-6"
+                  >
+                    {markCompletedMutation.isPending ? (
+                      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    Mark as completed
+                  </Button>
+                </div>
+              )}
             {activity?.status === "completed" && (
               <div className="mt-8 flex justify-center text-emerald-500 font-medium items-center gap-2">
                 <CheckCircle2 className="h-5 w-5" /> Completed

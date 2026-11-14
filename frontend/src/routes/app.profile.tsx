@@ -20,7 +20,13 @@ import {
   UserRound,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type ComponentType, type FormEvent, type ReactNode, useEffect, useState } from "react";
+import {
+  type ComponentType,
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,8 +311,8 @@ function ProfilePage() {
 
   const { tab } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const activeTab = ["details", "badges", "security"].includes(tab) 
-    ? (tab as "details" | "badges" | "security") 
+  const activeTab = ["details", "badges", "security"].includes(tab)
+    ? (tab as "details" | "badges" | "security")
     : "details";
 
   const setActiveTab = (newTab: "details" | "badges" | "security") => {
@@ -428,20 +434,46 @@ function ProfilePage() {
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       <ProfileInfoCard
                         label="Profile type"
-                        value={PROFILE_TYPES.find(p => p.value === profileType)?.title || "Not selected"}
-                        icon={PROFILE_TYPES.find(p => p.value === profileType)?.icon || UserRound}
+                        value={
+                          PROFILE_TYPES.find((p) => p.value === profileType)
+                            ?.title || "Not selected"
+                        }
+                        icon={
+                          PROFILE_TYPES.find((p) => p.value === profileType)
+                            ?.icon || UserRound
+                        }
                       />
                       {profileType === "student" && (
                         <>
-                          <ProfileInfoCard label="Institution" value={institutionName || "Not set"} icon={School} />
-                          <ProfileInfoCard label="Grade / Class" value={gradeOrClass || "Not set"} icon={Hash} />
+                          <ProfileInfoCard
+                            label="Institution"
+                            value={institutionName || "Not set"}
+                            icon={School}
+                          />
+                          <ProfileInfoCard
+                            label="Grade / Class"
+                            value={gradeOrClass || "Not set"}
+                            icon={Hash}
+                          />
                         </>
                       )}
                       {profileType === "professional" && (
                         <>
-                          <ProfileInfoCard label="Organization" value={organizationName || "Not set"} icon={Building2} />
-                          <ProfileInfoCard label="Role" value={professionalRole || "Not set"} icon={Briefcase} />
-                          <ProfileInfoCard label="Experience" value={`${workExperience} year${workExperience === "1" ? "" : "s"}`} icon={Calendar} />
+                          <ProfileInfoCard
+                            label="Organization"
+                            value={organizationName || "Not set"}
+                            icon={Building2}
+                          />
+                          <ProfileInfoCard
+                            label="Role"
+                            value={professionalRole || "Not set"}
+                            icon={Briefcase}
+                          />
+                          <ProfileInfoCard
+                            label="Experience"
+                            value={`${workExperience} year${workExperience === "1" ? "" : "s"}`}
+                            icon={Calendar}
+                          />
                         </>
                       )}
                     </section>
@@ -529,11 +561,16 @@ function ProfilePage() {
 
                     {profileType === "student" && (
                       <div className="mt-6 grid gap-5 rounded-2xl bg-muted/70 p-4 sm:grid-cols-2">
-                        <Field label="School, college, or university" htmlFor="institution">
+                        <Field
+                          label="School, college, or university"
+                          htmlFor="institution"
+                        >
                           <Input
                             id="institution"
                             value={institutionName}
-                            onChange={(event) => setInstitutionName(event.target.value)}
+                            onChange={(event) =>
+                              setInstitutionName(event.target.value)
+                            }
                             maxLength={120}
                             className="h-11 rounded-xl bg-card"
                             required
@@ -543,7 +580,9 @@ function ProfilePage() {
                           <Input
                             id="grade-class"
                             value={gradeOrClass}
-                            onChange={(event) => setGradeOrClass(event.target.value)}
+                            onChange={(event) =>
+                              setGradeOrClass(event.target.value)
+                            }
                             maxLength={80}
                             placeholder="Enter grade or class"
                             className="h-11 rounded-xl bg-card"
@@ -559,23 +598,33 @@ function ProfilePage() {
                           <Input
                             id="organization"
                             value={organizationName}
-                            onChange={(event) => setOrganizationName(event.target.value)}
+                            onChange={(event) =>
+                              setOrganizationName(event.target.value)
+                            }
                             maxLength={120}
                             className="h-11 rounded-xl bg-card"
                             required
                           />
                         </Field>
-                        <Field label="Role or job title" htmlFor="professional-role">
+                        <Field
+                          label="Role or job title"
+                          htmlFor="professional-role"
+                        >
                           <Input
                             id="professional-role"
                             value={professionalRole}
-                            onChange={(event) => setProfessionalRole(event.target.value)}
+                            onChange={(event) =>
+                              setProfessionalRole(event.target.value)
+                            }
                             maxLength={120}
                             placeholder="Enter role or job title"
                             className="h-11 rounded-xl bg-card"
                           />
                         </Field>
-                        <Field label="Work experience (years)" htmlFor="work-experience">
+                        <Field
+                          label="Work experience (years)"
+                          htmlFor="work-experience"
+                        >
                           <Input
                             id="work-experience"
                             type="number"
@@ -583,7 +632,9 @@ function ProfilePage() {
                             max={70}
                             step={1}
                             value={workExperience}
-                            onChange={(event) => setWorkExperience(event.target.value)}
+                            onChange={(event) =>
+                              setWorkExperience(event.target.value)
+                            }
                             className="h-11 rounded-xl bg-card"
                             required
                           />
@@ -593,7 +644,8 @@ function ProfilePage() {
 
                     {profileType === "independent" && (
                       <p className="mt-6 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                        No school or workplace details are needed for an independent learner.
+                        No school or workplace details are needed for an
+                        independent learner.
                       </p>
                     )}
 
@@ -626,235 +678,246 @@ function ProfilePage() {
               </motion.div>
             )}
 
-          {activeTab === "badges" && (
-            <motion.section
-              key="badges"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"
-            >
-              <div className="flex items-start gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-400/20 text-amber-700 dark:text-amber-300">
-                  <Award className="h-5 w-5" />
-                </span>
-                <div>
-                  <h2 className="font-display text-2xl tracking-tight">
-                    Course badges
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Complete every activity in a course to earn its badge.
-                  </p>
-                </div>
-              </div>
-
-              {courses.isLoading && (
-                <div className="mt-6 grid gap-3 xl:grid-cols-2">
-                  {[0, 1].map((item) => (
-                    <div
-                      key={item}
-                      className="h-32 animate-pulse rounded-2xl bg-muted"
-                    />
-                  ))}
-                </div>
-              )}
-
-              {!courses.isLoading && earnedBadges.length === 0 && (
-                <div className="mt-6 flex items-center gap-4 rounded-2xl border border-dashed border-border bg-background/45 p-5">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+            {activeTab === "badges" && (
+              <motion.section
+                key="badges"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-400/20 text-amber-700 dark:text-amber-300">
                     <Award className="h-5 w-5" />
                   </span>
                   <div>
-                    <div className="font-semibold">Your first badge is waiting</div>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      Finish a learning path to add a course badge here.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {earnedBadges.length > 0 && (
-                <div className="mt-6 grid gap-3 xl:grid-cols-2">
-                  {earnedBadges.map((course, index) => (
-                    <motion.div
-                      key={course.session_id}
-                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Link
-                        to="/app/session/$id/path"
-                        params={{ id: course.session_id }}
-                        className="group flex h-full items-center gap-4 rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-400/20 via-background/70 to-accent/10 p-4 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]"
-                      >
-                        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-amber-400 text-amber-950 shadow-sm">
-                          <Award className="h-7 w-7" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-[11px] font-bold uppercase tracking-[0.15em] text-amber-700 dark:text-amber-300">
-                            Course completed
-                          </span>
-                          <span className="mt-1 block line-clamp-2 font-display text-xl leading-tight tracking-tight">
-                            {course.topic}
-                          </span>
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            {course.total_modules} modules mastered
-                          </span>
-                        </span>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </motion.section>
-          )}
-
-          {activeTab === "security" && (
-            <motion.div
-              key="security"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6"
-            >
-              <section className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-display text-2xl tracking-tight">Plan</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {user?.plan === "pro"
-                        ? "Pro — 100 Quick and 30 Deep Focus course generations per 24 hours."
-                        : user?.plan === "plus"
-                          ? "Plus — 20 Quick and 10 Deep Focus course generations per 24 hours."
-                          : "Free — 5 Quick and 3 Deep Focus course generations per 24 hours."}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-accent/10 px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-accent">
-                      {user?.plan === "pro"
-                        ? "Pro"
-                        : user?.plan === "plus"
-                          ? "Plus"
-                          : "Free"}
-                    </span>
-                    <Link
-                      to="/app/pricing"
-                      className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90"
-                    >
-                      Upgrade
-                    </Link>
-                  </div>
-                </div>
-              </section>
-
-              <form
-                onSubmit={handlePasswordSubmit}
-                className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
-                    <KeyRound className="h-5 w-5" />
-                  </span>
-                  <div>
                     <h2 className="font-display text-2xl tracking-tight">
-                      Change password
+                      Course badges
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Verify a one-time code sent to your email before choosing a new
-                      password.
+                      Complete every activity in a course to earn its badge.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-5">
-                  {passwordStep === "start" && (
-                    <p className="rounded-2xl bg-muted/70 px-4 py-3 text-sm text-muted-foreground">
-                      We will send a short verification code to {user?.email}.
-                    </p>
-                  )}
-                  {passwordStep === "verify" && (
-                    <Field label="Verification code" htmlFor="password-code">
-                      <Input
-                        id="password-code"
-                        value={passwordCode}
-                        onChange={(event) =>
-                          setPasswordCode(
-                            event.target.value.replace(/\D/g, "").slice(0, 4),
-                          )
-                        }
-                        placeholder="Enter 4-digit code"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        className="h-11 rounded-xl bg-background"
-                        required
+                {courses.isLoading && (
+                  <div className="mt-6 grid gap-3 xl:grid-cols-2">
+                    {[0, 1].map((item) => (
+                      <div
+                        key={item}
+                        className="h-32 animate-pulse rounded-2xl bg-muted"
                       />
-                    </Field>
-                  )}
-                  {passwordStep === "new" && (
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <Field label="New password" htmlFor="new-password">
-                        <PasswordInput
-                          id="new-password"
-                          value={newPassword}
-                          onChange={(event) => setNewPassword(event.target.value)}
-                          minLength={8}
-                          maxLength={128}
-                          autoComplete="new-password"
-                          className="h-11 rounded-xl bg-background"
-                          required
-                        />
-                      </Field>
-                      <Field label="Confirm new password" htmlFor="confirm-password">
-                        <PasswordInput
-                          id="confirm-password"
-                          value={confirmPassword}
-                          onChange={(event) => setConfirmPassword(event.target.value)}
-                          minLength={8}
-                          maxLength={128}
-                          autoComplete="new-password"
-                          className="h-11 rounded-xl bg-background"
-                          required
-                        />
-                      </Field>
-                    </div>
-                  )}
-                </div>
-                {passwordStep === "new" && (
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                    Use at least 8 characters, including a letter and a number.
-                  </p>
+                    ))}
+                  </div>
                 )}
 
-                <NoticeMessage notice={passwordNotice} />
+                {!courses.isLoading && earnedBadges.length === 0 && (
+                  <div className="mt-6 flex items-center gap-4 rounded-2xl border border-dashed border-border bg-background/45 p-5">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                      <Award className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <div className="font-semibold">
+                        Your first badge is waiting
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Finish a learning path to add a course badge here.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    type="submit"
-                    disabled={savingPassword}
-                    className="h-11 rounded-full px-5"
-                  >
-                    {savingPassword && (
-                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                {earnedBadges.length > 0 && (
+                  <div className="mt-6 grid gap-3 xl:grid-cols-2">
+                    {earnedBadges.map((course, index) => (
+                      <motion.div
+                        key={course.session_id}
+                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Link
+                          to="/app/session/$id/path"
+                          params={{ id: course.session_id }}
+                          className="group flex h-full items-center gap-4 rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-400/20 via-background/70 to-accent/10 p-4 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]"
+                        >
+                          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-amber-400 text-amber-950 shadow-sm">
+                            <Award className="h-7 w-7" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-bold uppercase tracking-[0.15em] text-amber-700 dark:text-amber-300">
+                              Course completed
+                            </span>
+                            <span className="mt-1 block line-clamp-2 font-display text-xl leading-tight tracking-tight">
+                              {course.topic}
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {course.total_modules} modules mastered
+                            </span>
+                          </span>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.section>
+            )}
+
+            {activeTab === "security" && (
+              <motion.div
+                key="security"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                <section className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-display text-2xl tracking-tight">
+                        Plan
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {user?.plan === "pro"
+                          ? "Pro — 100 Quick and 30 Deep Focus course generations per 24 hours."
+                          : user?.plan === "plus"
+                            ? "Plus — 20 Quick and 10 Deep Focus course generations per 24 hours."
+                            : "Free — 5 Quick and 3 Deep Focus course generations per 24 hours."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-accent/10 px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-accent">
+                        {user?.plan === "pro"
+                          ? "Pro"
+                          : user?.plan === "plus"
+                            ? "Plus"
+                            : "Free"}
+                      </span>
+                      <Link
+                        to="/app/pricing"
+                        className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition hover:opacity-90"
+                      >
+                        Upgrade
+                      </Link>
+                    </div>
+                  </div>
+                </section>
+
+                <form
+                  onSubmit={handlePasswordSubmit}
+                  className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                      <KeyRound className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-display text-2xl tracking-tight">
+                        Change password
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Verify a one-time code sent to your email before
+                        choosing a new password.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-5">
+                    {passwordStep === "start" && (
+                      <p className="rounded-2xl bg-muted/70 px-4 py-3 text-sm text-muted-foreground">
+                        We will send a short verification code to {user?.email}.
+                      </p>
                     )}
-                    {passwordStep === "start"
-                      ? "Send code"
-                      : passwordStep === "verify"
-                        ? "Verify code"
-                        : "Change password"}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          )}
+                    {passwordStep === "verify" && (
+                      <Field label="Verification code" htmlFor="password-code">
+                        <Input
+                          id="password-code"
+                          value={passwordCode}
+                          onChange={(event) =>
+                            setPasswordCode(
+                              event.target.value.replace(/\D/g, "").slice(0, 4),
+                            )
+                          }
+                          placeholder="Enter 4-digit code"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          className="h-11 rounded-xl bg-background"
+                          required
+                        />
+                      </Field>
+                    )}
+                    {passwordStep === "new" && (
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <Field label="New password" htmlFor="new-password">
+                          <PasswordInput
+                            id="new-password"
+                            value={newPassword}
+                            onChange={(event) =>
+                              setNewPassword(event.target.value)
+                            }
+                            minLength={8}
+                            maxLength={128}
+                            autoComplete="new-password"
+                            className="h-11 rounded-xl bg-background"
+                            required
+                          />
+                        </Field>
+                        <Field
+                          label="Confirm new password"
+                          htmlFor="confirm-password"
+                        >
+                          <PasswordInput
+                            id="confirm-password"
+                            value={confirmPassword}
+                            onChange={(event) =>
+                              setConfirmPassword(event.target.value)
+                            }
+                            minLength={8}
+                            maxLength={128}
+                            autoComplete="new-password"
+                            className="h-11 rounded-xl bg-background"
+                            required
+                          />
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+                  {passwordStep === "new" && (
+                    <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                      Use at least 8 characters, including a letter and a
+                      number.
+                    </p>
+                  )}
+
+                  <NoticeMessage notice={passwordNotice} />
+
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={savingPassword}
+                      className="h-11 rounded-full px-5"
+                    >
+                      {savingPassword && (
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                      )}
+                      {passwordStep === "start"
+                        ? "Send code"
+                        : passwordStep === "verify"
+                          ? "Verify code"
+                          : "Change password"}
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </div>
     </div>
   );
 }
-
 
 function Field({
   label,
